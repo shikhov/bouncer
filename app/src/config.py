@@ -1,0 +1,2 @@
+DBNAME = 'bouncer'
+CONNSTRING = ''
