@@ -75,9 +75,12 @@ async def processCmdReload(message: types.Message):
     await message.answer('Settings sucessfully reloaded')
 
 
-@dp.message_handler()
+@dp.message_handler(content_types=types.ContentTypes.ANY)
 async def processMsg(message: types.Message):
     if message.from_user.id == ADMINCHATID: return
+    if message.sender_chat:
+        await message.delete()
+        return
 
     text = message.text if message.text else message.caption
     if not text: return
