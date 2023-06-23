@@ -78,7 +78,8 @@ async def processCmdReload(message: types.Message):
 @dp.message_handler(content_types=types.ContentTypes.ANY)
 async def processMsg(message: types.Message):
     if message.from_user.id == ADMINCHATID: return
-    if message.sender_chat:
+    if message.sender_chat or message.reply_markup:
+        await message.forward(ADMINCHATID)
         await message.delete()
         return
 
