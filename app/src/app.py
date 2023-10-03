@@ -41,6 +41,7 @@ dp.middleware.setup(LoggingMiddleware())
 
 
 def isSpam(text):
+    if not text: return False
     for regex in REGEX_LIST:
         if re.search(regex, text, re.IGNORECASE + re.UNICODE):
             return True
@@ -78,13 +79,13 @@ async def processCmdReload(message: types.Message):
 @dp.message_handler(content_types=types.ContentTypes.ANY)
 async def processMsg(message: types.Message):
     if message.from_user.id == ADMINCHATID: return
-    if message.sender_chat or message.reply_markup:
-        await message.forward(ADMINCHATID)
+    if message.sender_chat:
         await message.delete()
         return
 
     text = message.text if message.text else message.caption
-    if not text: return
+    if not (text or message.reply_markup):
+        return
 
     db = MongoClient(CONNSTRING).get_database(DBNAME)
     docid = str(message.chat.id) + '_' + str(message.from_user.id)
@@ -93,7 +94,7 @@ async def processMsg(message: types.Message):
     if not doc: return
     if doc['islegal']: return
 
-    if isSpam(text):
+    if isSpam(text) or message.reply_markup:
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
         await message.forward(ADMINCHATID)
         await message.delete()
