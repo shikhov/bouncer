@@ -34,6 +34,9 @@ logging.basicConfig(level=logging.INFO)
 # settings
 loadSettings()
 
+# users cache
+users = {}
+
 # Initialize bot and dispatcher
 bot = Bot(token=TOKEN, parse_mode='HTML')
 dp = Dispatcher(bot)
@@ -47,6 +50,33 @@ def isSpam(text):
             return True
 
     return False
+
+
+def getUser(message):
+    key = str(message.chat.id) + '_' + str(message.from_user.id)
+    if key in users:
+        logging.info(key + ': from cache')
+        return users[key]
+
+    db = MongoClient(CONNSTRING).get_database(DBNAME)
+    doc = db.users.find_one({'_id': key})
+    if doc:
+        users[key] = doc
+        logging.info(key + ': from DB')
+    else:
+        logging.info(key + ': not found in DB, insert new')
+        doc = {
+                '_id': key,
+                'first_name': message.from_user.first_name,
+                'last_name': message.from_user.last_name,
+                'username': message.from_user.username,
+                'chat_title': message.chat.title,
+                'islegal': True
+            }
+        db.users.insert_one(doc)
+        users[key] = doc
+
+    return doc
 
 
 @dp.message_handler(content_types='new_chat_members')
@@ -68,6 +98,7 @@ async def processJoin(message: types.Message):
                 'islegal': False
             }
             db.users.insert_one(data)
+            users[docid] = data
 
 
 @dp.message_handler(commands='reload', chat_id=ADMINCHATID)
@@ -87,21 +118,22 @@ async def processMsg(message: types.Message):
     if not (text or message.reply_markup):
         return
 
-    db = MongoClient(CONNSTRING).get_database(DBNAME)
-    docid = str(message.chat.id) + '_' + str(message.from_user.id)
-    doc = db.users.find_one({'_id': docid})
-
-    if not doc: return
+    doc = getUser(message)
+    logging.info(doc)
     if doc['islegal']: return
+
+    db = MongoClient(CONNSTRING).get_database(DBNAME)
 
     if isSpam(text) or message.reply_markup:
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
         await message.forward(ADMINCHATID)
         await message.delete()
         await bot.send_message(ADMINCHATID, "💩 Spam from user: " + message.from_user.full_name)
-        db.users.delete_one({'_id': docid})
+        db.users.delete_one({'_id': doc['_id']})
+        users.pop(doc['_id'])
     else:
         db.users.update_one({'_id' : doc.get('_id') }, {'$set': {'islegal': True}})
+        users[doc['_id']]['islegal'] = True
 
 
 
