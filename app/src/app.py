@@ -96,6 +96,23 @@ async def processJoin(message: types.Message):
             usersCache[docid] = False
 
 
+@dp.message_handler(regexp=r'^unban$', chat_id=ADMINCHATID)
+async def processCmdUnban(message: types.Message):
+    if not (message.reply_to_message and message.reply_to_message.text):
+        await message.answer('⚠ You must reply to message to use this command')
+        return
+    rg = re.search(r'\n(-?\d+_\d+)$', message.reply_to_message.text)
+    if not rg:
+        await message.answer('⚠ IDs not found in message')
+        return
+    (chat_id, user_id) = rg.group(1).split('_')
+    result = await bot.unban_chat_member(chat_id=chat_id, user_id=user_id, only_if_banned=True)
+    if not result:
+        await message.answer('⚠ User unban error')
+        return
+    await message.answer('✅ User unbanned successfully')
+
+
 @dp.message_handler(commands='reload', chat_id=ADMINCHATID)
 async def processCmdReload(message: types.Message):
     loadSettings()
@@ -123,7 +140,7 @@ async def processMsg(message: types.Message):
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
         await message.forward(ADMINCHATID)
         await message.delete()
-        await bot.send_message(ADMINCHATID, "💩 Spam from user: " + message.from_user.full_name)
+        await bot.send_message(ADMINCHATID, '💩 Spam from user: ' + message.from_user.full_name + '\n' + key)
         db.users.delete_one({'_id': key})
         usersCache.pop(key)
     else:
