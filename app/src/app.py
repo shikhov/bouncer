@@ -52,6 +52,13 @@ def isSpam(text):
     return False
 
 
+def hasLinks(message):
+    for entity in message.entities:
+        if entity.type in ['text_link', 'url', 'mention']:
+            return True
+    return False
+
+
 def isUserLegal(message):
     key = str(message.chat.id) + '_' + str(message.from_user.id)
     if key in usersCache:
@@ -126,17 +133,17 @@ async def processMsg(message: types.Message):
         await message.delete()
         return
 
-    text = message.text if message.text else message.caption
-    if not (text or message.reply_markup):
+    if isUserLegal(message):
         return
 
-    if isUserLegal(message):
+    text = message.text if message.text else message.caption
+    if not (text or message.reply_markup):
         return
 
     db = MongoClient(CONNSTRING).get_database(DBNAME)
     key = str(message.chat.id) + '_' + str(message.from_user.id)
 
-    if isSpam(text) or message.reply_markup:
+    if isSpam(text) or message.reply_markup or hasLinks(message):
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
         await message.forward(ADMINCHATID)
         await message.delete()
