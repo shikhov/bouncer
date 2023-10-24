@@ -53,7 +53,7 @@ def isSpam(text):
 
 
 def hasLinks(message):
-    for entity in message.entities:
+    for entity in (message.entities + message.caption_entities):
         if entity.type in ['text_link', 'url', 'mention']:
             return True
     return False
