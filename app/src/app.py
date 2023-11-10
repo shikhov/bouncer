@@ -82,13 +82,22 @@ def isUserLegal(message):
 
 
 @dp.message_handler(content_types='new_chat_members')
-async def processJoin(message: types.Message):
+async def removeJoinMessage(message: types.Message):
     await message.delete()
 
-    db = MongoClient(CONNSTRING).get_database(DBNAME)
-    for user in message.new_chat_members:
-        await bot.send_message(ADMINCHATID, '👤 ' + user.full_name + ' joined ' + message.chat.title)
-        docid = str(message.chat.id) + '_' + str(user.id)
+
+@dp.chat_member_handler()
+async def processJoin(event: types.ChatMemberUpdated):
+    old = event.old_chat_member
+    new = event.new_chat_member
+    user = new.user
+    chat = event.chat
+
+    if not old.is_chat_member() and new.is_chat_member():
+        await bot.send_message(ADMINCHATID, '👤 ' + user.full_name + ' joined ' + chat.title)
+
+        db = MongoClient(CONNSTRING).get_database(DBNAME)
+        docid = str(chat.id) + '_' + str(user.id)
         doc = db.users.find_one({'_id': docid})
         if not doc:
             data = {
@@ -96,7 +105,7 @@ async def processJoin(message: types.Message):
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'username': user.username,
-                'chat_title': message.chat.title,
+                'chat_title': chat.title,
                 'islegal': False
             }
             db.users.insert_one(data)
@@ -157,4 +166,4 @@ async def processMsg(message: types.Message):
 
 
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, allowed_updates=types.AllowedUpdates.all())
