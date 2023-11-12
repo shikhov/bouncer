@@ -96,20 +96,24 @@ async def processJoin(event: types.ChatMemberUpdated):
     if not old.is_chat_member() and new.is_chat_member():
         # await bot.send_message(ADMINCHATID, '👤 ' + user.full_name + ' joined ' + chat.title)
 
-        db = MongoClient(CONNSTRING).get_database(DBNAME)
         docid = str(chat.id) + '_' + str(user.id)
-        doc = db.users.find_one({'_id': docid})
-        if not doc:
-            data = {
+        data = {
                 '_id': docid,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'username': user.username,
                 'chat_title': chat.title,
-                'islegal': False
-            }
-            db.users.insert_one(data)
-            usersCache[docid] = False
+        }
+
+        db = MongoClient(CONNSTRING).get_database(DBNAME)
+        doc = db.users.find_one({'_id': docid})
+        if doc:
+            data['islegal'] = doc['islegal']
+        else:
+            data['islegal'] = False
+
+        db.users.update_one({'_id': docid}, {'$set': data}, upsert=True)
+        usersCache[docid] = data['islegal']
 
 
 @dp.message_handler(regexp=r'^unban$', chat_id=ADMINCHATID)
@@ -121,11 +125,19 @@ async def processCmdUnban(message: types.Message):
     if not rg:
         await message.answer('⚠ IDs not found in message')
         return
-    (chat_id, user_id) = rg.group(1).split('_')
+    key = rg.group(1)
+    (chat_id, user_id) = key.split('_')
     result = await bot.unban_chat_member(chat_id=chat_id, user_id=user_id, only_if_banned=True)
     if not result:
         await message.answer('⚠ User unban error')
         return
+    db = MongoClient(CONNSTRING).get_database(DBNAME)
+    data = {
+        '_id': key,
+        'islegal': True
+    }
+    db.users.insert_one(data)
+    usersCache[key] = True
     await message.answer('✅ User unbanned successfully')
 
 
