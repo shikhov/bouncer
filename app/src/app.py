@@ -94,7 +94,7 @@ async def processJoin(event: types.ChatMemberUpdated):
     chat = event.chat
 
     if not old.is_chat_member() and new.is_chat_member():
-        await bot.send_message(ADMINCHATID, '👤 ' + user.full_name + ' joined ' + chat.title)
+        # await bot.send_message(ADMINCHATID, '👤 ' + user.full_name + ' joined ' + chat.title)
 
         db = MongoClient(CONNSTRING).get_database(DBNAME)
         docid = str(chat.id) + '_' + str(user.id)
@@ -154,9 +154,11 @@ async def processMsg(message: types.Message):
 
     if isSpam(text) or message.reply_markup or hasLinks(message):
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
-        await message.forward(ADMINCHATID)
+        if not message.reply_markup:
+            await message.forward(ADMINCHATID)
+            await bot.send_message(ADMINCHATID, '💩 Spam from user: ' + message.from_user.full_name + '\n' + key)
+
         await message.delete()
-        await bot.send_message(ADMINCHATID, '💩 Spam from user: ' + message.from_user.full_name + '\n' + key)
         db.users.delete_one({'_id': key})
         usersCache.pop(key)
     else:
