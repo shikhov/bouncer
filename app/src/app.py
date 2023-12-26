@@ -6,11 +6,12 @@ from aiogram.dispatcher.middlewares import BaseMiddleware
 from pymongo import MongoClient
 
 from config import CONNSTRING, DBNAME
+db = MongoClient(CONNSTRING).get_database(DBNAME)
+
 
 def loadSettings():
     global TOKEN, ADMINCHATID, REGEX_LIST
 
-    db = MongoClient(CONNSTRING).get_database(DBNAME)
     settings = db.settings.find_one({'_id': 'settings'})
 
     TOKEN = settings['TOKEN']
@@ -64,7 +65,6 @@ def isUserLegal(message):
     if key in usersCache:
         return usersCache[key]
 
-    db = MongoClient(CONNSTRING).get_database(DBNAME)
     doc = db.users.find_one({'_id': key})
     if not doc:
         doc = {
@@ -105,7 +105,6 @@ async def processJoin(event: types.ChatMemberUpdated):
                 'chat_title': chat.title,
         }
 
-        db = MongoClient(CONNSTRING).get_database(DBNAME)
         doc = db.users.find_one({'_id': docid})
         if doc:
             data['islegal'] = doc['islegal']
@@ -131,7 +130,6 @@ async def processCmdUnban(message: types.Message):
     if not result:
         await message.answer('⚠ User unban error')
         return
-    db = MongoClient(CONNSTRING).get_database(DBNAME)
     data = {
         '_id': key,
         'islegal': True
@@ -161,7 +159,6 @@ async def processMsg(message: types.Message):
     if not (text or message.reply_markup):
         return
 
-    db = MongoClient(CONNSTRING).get_database(DBNAME)
     key = str(message.chat.id) + '_' + str(message.from_user.id)
 
     if isSpam(text) or message.reply_markup or hasLinks(message):
