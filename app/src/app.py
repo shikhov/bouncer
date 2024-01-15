@@ -85,14 +85,14 @@ def isUserLegal(message):
 async def isChatAllowed(chat):
     if not ALLOWED_CHATS: return True
     if chat.type == 'private': return True
-    if chat.id not in ALLOWED_CHATS:
-        logging.info(f'chat id {chat.id} is not allowed! Leaving chat')
-        try:
-            await bot.leave_chat(chat.id)
-        except Exception:
-            pass
-        return False
-    return True
+    if chat.id in ALLOWED_CHATS: return True
+
+    logging.info(f'chat id {chat.id} is not allowed! Leaving chat')
+    try:
+        await bot.leave_chat(chat.id)
+    except Exception:
+        pass
+    return False
 
 
 @dp.message_handler(content_types='new_chat_members')
