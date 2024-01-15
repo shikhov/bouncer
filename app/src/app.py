@@ -10,13 +10,14 @@ db = MongoClient(CONNSTRING).get_database(DBNAME)
 
 
 def loadSettings():
-    global TOKEN, ADMINCHATID, REGEX_LIST
+    global TOKEN, ADMINCHATID, REGEX_LIST, ALLOWED_CHATS
 
     settings = db.settings.find_one({'_id': 'settings'})
 
     TOKEN = settings['TOKEN']
     ADMINCHATID = settings['ADMINCHATID']
     REGEX_LIST = settings['REGEX_LIST']
+    ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
 
 
 class LoggingMiddleware(BaseMiddleware):
@@ -81,21 +82,35 @@ def isUserLegal(message):
     return usersCache[key]
 
 
+async def isChatAllowed(chat):
+    if not ALLOWED_CHATS: return True
+    if chat.type == 'private': return True
+    if chat.id not in ALLOWED_CHATS:
+        logging.info(f'chat id {chat.id} is not allowed! Leaving chat')
+        try:
+            await bot.leave_chat(chat.id)
+        except Exception:
+            pass
+        return False
+    return True
+
+
 @dp.message_handler(content_types='new_chat_members')
 async def removeJoinMessage(message: types.Message):
+    if not await isChatAllowed(message.chat): return
     await message.delete()
 
 
 @dp.chat_member_handler()
 async def processJoin(event: types.ChatMemberUpdated):
+    if not await isChatAllowed(event.chat): return
+
     old = event.old_chat_member
     new = event.new_chat_member
     user = new.user
     chat = event.chat
 
     if not old.is_chat_member() and new.is_chat_member():
-        # await bot.send_message(ADMINCHATID, '👤 ' + user.full_name + ' joined ' + chat.title)
-
         docid = str(chat.id) + '_' + str(user.id)
         data = {
                 '_id': docid,
@@ -147,7 +162,9 @@ async def processCmdReload(message: types.Message):
 
 @dp.message_handler(content_types=types.ContentTypes.ANY)
 async def processMsg(message: types.Message):
+    if not await isChatAllowed(message.chat): return
     if message.from_user.id == ADMINCHATID: return
+
     if message.sender_chat:
         await message.delete()
         return
