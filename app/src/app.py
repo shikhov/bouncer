@@ -25,10 +25,9 @@ class LoggingMiddleware(BaseMiddleware):
         super(LoggingMiddleware, self).__init__()
 
     async def on_post_process_message(self, message: types.Message, results, data: dict):
-        text = message.text if message.text else message.caption
-        if not text: return
-        title = '[' + message.chat.title + '] ' if message.chat.title else ''
-        logging.info(title + message.from_user.full_name + ': ' + text)
+        text = message.text or message.caption
+        if text:
+            logging.info(f'[{message.chat.title}]{message.from_user.full_name}: {text}')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,7 +44,7 @@ dp = Dispatcher(bot)
 dp.middleware.setup(LoggingMiddleware())
 
 
-def isSpam(text):
+def checkRegex(text):
     if not text: return False
     for regex in REGEX_LIST:
         if re.search(regex, text, re.IGNORECASE + re.UNICODE):
@@ -145,11 +144,8 @@ async def processCmdUnban(message: types.Message):
     if not result:
         await message.answer('⚠ User unban error')
         return
-    data = {
-        '_id': key,
-        'islegal': True
-    }
-    db.users.insert_one(data)
+
+    db.users.insert_one({'_id': key, 'islegal': True})
     usersCache[key] = True
     await message.answer('✅ User unbanned successfully')
 
@@ -172,13 +168,13 @@ async def processMsg(message: types.Message):
     if isUserLegal(message):
         return
 
-    text = message.text if message.text else message.caption
+    text = message.text or message.caption
     if not (text or message.reply_markup):
         return
 
     key = str(message.chat.id) + '_' + str(message.from_user.id)
 
-    if isSpam(text) or message.reply_markup or hasLinks(message):
+    if checkRegex(text) or message.reply_markup or hasLinks(message):
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
         if not message.reply_markup:
             await message.forward(ADMINCHATID)
