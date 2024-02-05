@@ -1,8 +1,11 @@
 import logging
 import re
+import asyncio
+from datetime import datetime, timedelta
 
-from aiogram import Bot, Dispatcher, executor, types
-from aiogram.dispatcher.middlewares import BaseMiddleware
+from aiogram import Bot, Dispatcher, Router, F, types
+from aiogram.dispatcher.middlewares.base import BaseMiddleware
+from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, JOIN_TRANSITION
 from pymongo import MongoClient
 
 from config import CONNSTRING, DBNAME
@@ -40,8 +43,9 @@ usersCache = {}
 
 # Initialize bot and dispatcher
 bot = Bot(token=TOKEN, parse_mode='HTML')
-dp = Dispatcher(bot)
-dp.middleware.setup(LoggingMiddleware())
+dp = Dispatcher()
+# dp.middleware.setup(LoggingMiddleware())
+router = Router()
 
 
 def checkRegex(text):
@@ -53,14 +57,15 @@ def checkRegex(text):
     return False
 
 
-def hasLinks(message):
-    for entity in (message.entities + message.caption_entities):
+def hasLinks(message: types.Message):
+    entities = message.entities or message.caption_entities or []
+    for entity in entities:
         if entity.type in {'text_link', 'url', 'mention'}:
             return True
     return False
 
 
-def isUserLegal(message):
+def isUserLegal(message: types.Message):
     key = str(message.chat.id) + '_' + str(message.from_user.id)
     if key in usersCache:
         return usersCache[key]
@@ -81,7 +86,7 @@ def isUserLegal(message):
     return usersCache[key]
 
 
-async def isChatAllowed(chat):
+async def isChatAllowed(chat: types.Chat):
     if not ALLOWED_CHATS: return True
     if chat.id in ALLOWED_CHATS: return True
     if chat.type == 'private': return True
@@ -94,42 +99,46 @@ async def isChatAllowed(chat):
     return False
 
 
-@dp.message_handler(content_types='new_chat_members')
+@router.message(F.new_chat_members)
 async def removeJoinMessage(message: types.Message):
+    user = message.from_user
+    chat = message.chat
+    dt = (datetime.now()+timedelta(hours=5)).strftime('%d.%m.%Y %H:%M:%S')
+    logging.info(f'{dt}[{chat.title or chat.id}]{user.full_name} {user.id}: >>> new_chat_members')
     if not await isChatAllowed(message.chat): return
     await message.delete()
 
 
-@dp.chat_member_handler()
+@router.chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
 async def processJoin(event: types.ChatMemberUpdated):
     if not await isChatAllowed(event.chat): return
 
-    old = event.old_chat_member
-    new = event.new_chat_member
-    user = new.user
+    user = event.new_chat_member.user
     chat = event.chat
 
-    if not old.is_chat_member() and new.is_chat_member():
-        docid = str(chat.id) + '_' + str(user.id)
-        data = {
-                '_id': docid,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'username': user.username,
-                'chat_title': chat.title,
-        }
+    dt = (datetime.now()+timedelta(hours=5)).strftime('%d.%m.%Y %H:%M:%S')
+    logging.info(f'{dt}[{chat.title or chat.id}]{user.full_name} joined {chat.title}')
 
-        doc = db.users.find_one({'_id': docid})
-        if doc:
-            data['islegal'] = doc['islegal']
-        else:
-            data['islegal'] = False
+    docid = str(chat.id) + '_' + str(user.id)
+    data = {
+            '_id': docid,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'username': user.username,
+            'chat_title': chat.title,
+    }
 
-        db.users.update_one({'_id': docid}, {'$set': data}, upsert=True)
-        usersCache[docid] = data['islegal']
+    doc = db.users.find_one({'_id': docid})
+    if doc:
+        data['islegal'] = doc['islegal']
+    else:
+        data['islegal'] = False
+
+    db.users.update_one({'_id': docid}, {'$set': data}, upsert=True)
+    usersCache[docid] = data['islegal']
 
 
-@dp.message_handler(regexp=r'^unban$', chat_id=ADMINCHATID)
+@router.message((F.text == 'unban') & (F.chat.id == ADMINCHATID))
 async def processCmdUnban(message: types.Message):
     if not (message.reply_to_message and message.reply_to_message.text):
         await message.answer('⚠ You must reply to message to use this command')
@@ -150,22 +159,36 @@ async def processCmdUnban(message: types.Message):
     await message.answer('✅ User unbanned successfully')
 
 
-@dp.message_handler(commands='reload', chat_id=ADMINCHATID)
+@router.message((F.text == '/reload') & (F.chat.id == ADMINCHATID))
 async def processCmdReload(message: types.Message):
     loadSettings()
     await message.answer('Settings sucessfully reloaded')
 
 
-@dp.message_handler(content_types=types.ContentTypes.ANY)
+@router.message(F.chat.type != 'private')
 async def processMsg(message: types.Message):
+    # -----------------------------------------------------------
+    # logging.info(message.model_dump_json(exclude_unset=True, indent=4))
+    user = message.from_user
+    chat = message.chat
+
+    dt = (datetime.now()+timedelta(hours=5)).strftime('%d.%m.%Y %H:%M:%S')
+    entry = f'{dt}[{chat.title or chat.id}\\{message.message_id}]'
+    logging.info(f'{entry} message from {user.full_name} {user.id}')
+    text = message.text or message.caption
+    logging.info(f'{entry} {user.full_name}: {text}')
+    # -----------------------------------------------------------
+
     if not await isChatAllowed(message.chat): return
     if message.from_user.id == ADMINCHATID: return
+    if message.from_user.id == bot.id: return
 
     if message.sender_chat:
         await message.delete()
         return
 
     if isUserLegal(message):
+        logging.info(f'{entry} {user.full_name} {user.id} is legal')
         return
 
     text = message.text or message.caption
@@ -183,11 +206,17 @@ async def processMsg(message: types.Message):
         await message.delete()
         db.users.delete_one({'_id': key})
         usersCache.pop(key)
+        logging.info(f'{entry} Spam from user: {user.full_name} {user.id}')
     else:
         db.users.update_one({'_id' : key}, {'$set': {'islegal': True}})
         usersCache[key] = True
+        logging.info(f'{entry} New user -> legal')
 
+
+async def main():
+    dp.include_router(router)
+    await dp.start_polling(bot)
 
 
 if __name__ == '__main__':
-    executor.start_polling(dp, allowed_updates=types.AllowedUpdates.all())
+    asyncio.run(main())
