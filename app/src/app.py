@@ -4,7 +4,6 @@ import asyncio
 from datetime import datetime, timedelta
 
 from aiogram import Bot, Dispatcher, Router, F, types
-from aiogram.dispatcher.middlewares.base import BaseMiddleware
 from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, JOIN_TRANSITION
 from pymongo import MongoClient
 
@@ -23,15 +22,6 @@ def loadSettings():
     ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
 
 
-class LoggingMiddleware(BaseMiddleware):
-    def __init__(self):
-        super(LoggingMiddleware, self).__init__()
-
-    async def on_post_process_message(self, message: types.Message, results, data: dict):
-        text = message.text or message.caption
-        if text:
-            logging.info(f'[{message.chat.title}]{message.from_user.full_name}: {text}')
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
@@ -44,7 +34,6 @@ usersCache = {}
 # Initialize bot and dispatcher
 bot = Bot(token=TOKEN, parse_mode='HTML')
 dp = Dispatcher()
-# dp.middleware.setup(LoggingMiddleware())
 router = Router()
 
 
@@ -117,7 +106,7 @@ async def processJoin(event: types.ChatMemberUpdated):
     chat = event.chat
 
     dt = (datetime.now()+timedelta(hours=5)).strftime('%d.%m.%Y %H:%M:%S')
-    logging.info(f'{dt}[{chat.title or chat.id}]{user.full_name} joined {chat.title}')
+    logging.info(f'{dt}[{chat.title or chat.id}]{user.full_name} joined chat')
 
     docid = str(chat.id) + '_' + str(user.id)
     data = {
@@ -168,7 +157,6 @@ async def processCmdReload(message: types.Message):
 @router.message(F.chat.type != 'private')
 async def processMsg(message: types.Message):
     # -----------------------------------------------------------
-    # logging.info(message.model_dump_json(exclude_unset=True, indent=4))
     user = message.from_user
     chat = message.chat
 
