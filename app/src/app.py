@@ -1,7 +1,6 @@
 import logging
 import re
 import asyncio
-from datetime import datetime, timedelta
 
 from aiogram import Bot, Dispatcher, Router, F, types
 from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, JOIN_TRANSITION
@@ -90,10 +89,6 @@ async def isChatAllowed(chat: types.Chat):
 
 @router.message(F.new_chat_members)
 async def removeJoinMessage(message: types.Message):
-    user = message.from_user
-    chat = message.chat
-    dt = (datetime.now()+timedelta(hours=5)).strftime('%d.%m.%Y %H:%M:%S')
-    logging.info(f'{dt}[{chat.title or chat.id}]{user.full_name} {user.id}: >>> new_chat_members')
     if not await isChatAllowed(message.chat): return
     await message.delete()
 
@@ -104,10 +99,6 @@ async def processJoin(event: types.ChatMemberUpdated):
 
     user = event.new_chat_member.user
     chat = event.chat
-
-    dt = (datetime.now()+timedelta(hours=5)).strftime('%d.%m.%Y %H:%M:%S')
-    logging.info(f'{dt}[{chat.title or chat.id}]{user.full_name} joined chat')
-
     docid = str(chat.id) + '_' + str(user.id)
     data = {
             '_id': docid,
@@ -156,17 +147,6 @@ async def processCmdReload(message: types.Message):
 
 @router.message(F.chat.type != 'private')
 async def processMsg(message: types.Message):
-    # -----------------------------------------------------------
-    user = message.from_user
-    chat = message.chat
-
-    dt = (datetime.now()+timedelta(hours=5)).strftime('%d.%m.%Y %H:%M:%S')
-    entry = f'{dt}[{chat.title or chat.id}\\{message.message_id}]'
-    logging.info(f'{entry} message from {user.full_name} {user.id}')
-    text = message.text or message.caption
-    logging.info(f'{entry} {user.full_name}: {text}')
-    # -----------------------------------------------------------
-
     if not await isChatAllowed(message.chat): return
     if message.from_user.id == ADMINCHATID: return
     if message.from_user.id == bot.id: return
@@ -176,7 +156,6 @@ async def processMsg(message: types.Message):
         return
 
     if isUserLegal(message):
-        logging.info(f'{entry} {user.full_name} {user.id} is legal')
         return
 
     text = message.text or message.caption
@@ -194,11 +173,9 @@ async def processMsg(message: types.Message):
         await message.delete()
         db.users.delete_one({'_id': key})
         usersCache.pop(key)
-        logging.info(f'{entry} Spam from user: {user.full_name} {user.id}')
     else:
         db.users.update_one({'_id' : key}, {'$set': {'islegal': True}})
         usersCache[key] = True
-        logging.info(f'{entry} New user -> legal')
 
 
 async def main():
