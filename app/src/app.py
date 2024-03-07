@@ -3,6 +3,7 @@ import re
 import asyncio
 
 from aiogram import Bot, Dispatcher, Router, F, types
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, JOIN_TRANSITION
 from pymongo import MongoClient
 
@@ -39,7 +40,7 @@ router = Router()
 def checkRegex(text):
     if not text: return False
     for regex in REGEX_LIST:
-        if re.search(regex, text, re.IGNORECASE + re.UNICODE):
+        if re.search(regex, text, re.IGNORECASE + re.ASCII):
             return True
 
     return False
@@ -129,9 +130,13 @@ async def processCmdUnban(message: types.Message):
         return
     key = rg.group(1)
     (chat_id, user_id) = key.split('_')
-    result = await bot.unban_chat_member(chat_id=chat_id, user_id=user_id, only_if_banned=True)
-    if not result:
-        await message.answer('⚠ User unban error')
+    try:
+        result = await bot.unban_chat_member(chat_id=chat_id, user_id=user_id, only_if_banned=True)
+        if not result:
+            await message.answer('⚠ User unban error')
+            return
+    except TelegramBadRequest as e:
+        await message.answer('⚠ ' + e.message)
         return
 
     db.users.insert_one({'_id': key, 'islegal': True})
