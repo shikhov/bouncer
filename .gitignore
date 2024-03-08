@@ -2,3 +2,4 @@ ansible/inventory/
 spot/inventory/
 __pycache__
 config
+tests
