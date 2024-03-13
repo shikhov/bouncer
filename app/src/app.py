@@ -40,7 +40,11 @@ router = Router()
 def checkRegex(text):
     if not text: return False
     for regex in REGEX_LIST:
-        if re.search(regex, text, re.IGNORECASE + re.ASCII):
+        flags = re.IGNORECASE + re.UNICODE
+        if regex.startswith(r'[\u'):
+            flags = re.IGNORECASE + re.ASCII
+
+        if re.search(regex, text, flags):
             return True
 
     return False
