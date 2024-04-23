@@ -12,15 +12,17 @@ db = MongoClient(CONNSTRING).get_database(DBNAME)
 
 
 def loadSettings():
-    global TOKEN, ADMINCHATID, REGEX_LIST, ALLOWED_CHATS
+    global TOKEN, ADMINCHATID, REGEX_LIST, CHATS
 
     settings = db.settings.find_one({'_id': 'settings'})
 
     TOKEN = settings['TOKEN']
     ADMINCHATID = settings['ADMINCHATID']
     REGEX_LIST = settings['REGEX_LIST']
-    ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
-
+    CHATS = {}
+    for entry in settings['CHATS']:
+        for chat in entry['chats']:
+            CHATS[chat] = entry['admin']
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -80,8 +82,7 @@ def isUserLegal(message: types.Message):
 
 
 async def isChatAllowed(chat: types.Chat):
-    if not ALLOWED_CHATS: return True
-    if chat.id in ALLOWED_CHATS: return True
+    if chat.id in CHATS: return True
     if chat.type == 'private': return True
 
     logging.info(f'chat id {chat.id} is not allowed! Leaving chat')
@@ -123,8 +124,10 @@ async def processJoin(event: types.ChatMemberUpdated):
     usersCache[docid] = data['islegal']
 
 
-@router.message((F.text == 'unban') & (F.chat.id == ADMINCHATID))
+@router.message((F.text.lower() == 'unban') & (F.chat.type == 'private'))
 async def processCmdUnban(message: types.Message):
+    if message.chat.id not in CHATS.values():
+        return
     if not (message.reply_to_message and message.reply_to_message.text):
         await message.answer('⚠ You must reply to message to use this command')
         return
@@ -134,6 +137,9 @@ async def processCmdUnban(message: types.Message):
         return
     key = rg.group(1)
     (chat_id, user_id) = key.split('_')
+    if CHATS.get(chat_id) != message.chat.id:
+        await message.answer('⚠ You are not admin of this chat')
+        return
     try:
         result = await bot.unban_chat_member(chat_id=chat_id, user_id=user_id, only_if_banned=True)
         if not result:
@@ -155,10 +161,13 @@ async def processCmdReload(message: types.Message):
 
 
 @router.message(F.chat.type != 'private')
-async def processMsg(message: types.Message):
-    if not await isChatAllowed(message.chat): return
-    if message.from_user.id == ADMINCHATID: return
-    if message.from_user.id == bot.id: return
+async def processChatMsg(message: types.Message):
+    chat = message.chat
+    user = message.from_user
+    if not await isChatAllowed(chat): return
+    admin_id = CHATS[chat.id]
+    if user.id == admin_id: return
+    if user.id == bot.id: return
 
     if message.sender_chat:
         await message.delete()
@@ -171,13 +180,13 @@ async def processMsg(message: types.Message):
     if not (text or message.reply_markup):
         return
 
-    key = str(message.chat.id) + '_' + str(message.from_user.id)
+    key = str(chat.id) + '_' + str(user.id)
 
     if checkRegex(text) or message.reply_markup or hasLinks(message):
-        await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
+        await bot.ban_chat_member(chat_id=chat.id, user_id=user.id)
         if not message.reply_markup:
-            await message.forward(ADMINCHATID)
-            await bot.send_message(ADMINCHATID, '💩 Spam from user: ' + message.from_user.full_name + '\n' + key)
+            await message.forward(admin_id)
+            await bot.send_message(admin_id, '💩 Spam from user: ' + user.full_name + '\n' + key)
 
         await message.delete()
         db.users.delete_one({'_id': key})
