@@ -3,3 +3,4 @@ spot/inventory/
 __pycache__
 config
 tests
+.vscode
