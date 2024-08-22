@@ -123,7 +123,7 @@ async def processJoin(event: types.ChatMemberUpdated):
     usersCache[docid] = data['islegal']
 
 
-@router.message((F.text == 'unban') & (F.chat.id == ADMINCHATID))
+@router.message((F.text.lower() == 'unban') & (F.chat.id == ADMINCHATID))
 async def processCmdUnban(message: types.Message):
     if not (message.reply_to_message and message.reply_to_message.text):
         await message.answer('⚠ You must reply to message to use this command')
