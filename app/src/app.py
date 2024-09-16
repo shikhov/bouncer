@@ -11,6 +11,35 @@ from config import CONNSTRING, DBNAME
 db = MongoClient(CONNSTRING).get_database(DBNAME)
 
 
+def processRegexList(regex_list):
+    subs = {
+        'а': 'a',
+        'к': 'k',
+        'и': 'u',
+        'р': 'p',
+        'о': 'o0',
+        'е': 'ёe',
+        'т': 't',
+        'с': 'c',
+        'н': 'h',
+        'в': 'b',
+        'з': '3',
+        'у': 'y',
+        'х': 'x'
+    }
+    out_list = []
+    for regex in regex_list:
+        out_regex = ''
+        for char in regex:
+            if char in subs:
+                out_regex += '[' + char + subs[char] + ']'
+            else:
+                out_regex += char
+        out_list.append(out_regex)
+
+    return out_list
+
+
 def loadSettings():
     global TOKEN, ADMINCHATID, REGEX_LIST, ALLOWED_CHATS
 
@@ -18,7 +47,7 @@ def loadSettings():
 
     TOKEN = settings['TOKEN']
     ADMINCHATID = settings['ADMINCHATID']
-    REGEX_LIST = settings['REGEX_LIST']
+    REGEX_LIST = processRegexList(settings['REGEX_LIST'])
     ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
 
 
