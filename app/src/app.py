@@ -79,10 +79,10 @@ def checkRegex(text):
     return False
 
 
-def hasLinks(message: types.Message):
+def checkEntities(message: types.Message):
     entities = message.entities or message.caption_entities or []
     for entity in entities:
-        if entity.type in {'text_link', 'url', 'mention'}:
+        if entity.type in {'text_link', 'url', 'mention', 'custom_emoji'}:
             return True
     return False
 
@@ -202,7 +202,7 @@ async def processMsg(message: types.Message):
 
     key = str(message.chat.id) + '_' + str(message.from_user.id)
 
-    if checkRegex(text) or message.reply_markup or hasLinks(message):
+    if checkRegex(text) or message.reply_markup or checkEntities(message):
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
         if not message.reply_markup:
             await message.forward(ADMINCHATID)
