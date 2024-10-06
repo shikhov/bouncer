@@ -47,7 +47,7 @@ def loadSettings():
 
     TOKEN = settings['TOKEN']
     ADMINCHATID = settings['ADMINCHATID']
-    REGEX_LIST = settings['REGEX_LIST']
+    REGEX_LIST = processRegexList(settings['REGEX_LIST'])
     CHATS = {}
     for entry in settings['CHATS']:
         for chat in entry['chats']:
