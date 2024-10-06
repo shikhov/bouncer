@@ -11,6 +11,35 @@ from config import CONNSTRING, DBNAME
 db = MongoClient(CONNSTRING).get_database(DBNAME)
 
 
+def processRegexList(regex_list):
+    subs = {
+        'а': 'a',
+        'к': 'k',
+        'и': 'u',
+        'р': 'p',
+        'о': 'o0',
+        'е': 'ёe',
+        'т': 't',
+        'с': 'c',
+        'н': 'h',
+        'в': 'b',
+        'з': '3',
+        'у': 'y',
+        'х': 'x'
+    }
+    out_list = []
+    for regex in regex_list:
+        out_regex = ''
+        for char in regex:
+            if char in subs:
+                out_regex += '[' + char + subs[char] + ']'
+            else:
+                out_regex += char
+        out_list.append(out_regex)
+
+    return out_list
+
+
 def loadSettings():
     global TOKEN, ADMINCHATID, REGEX_LIST, CHATS
 
@@ -52,10 +81,10 @@ def checkRegex(text):
     return False
 
 
-def hasLinks(message: types.Message):
+def checkEntities(message: types.Message):
     entities = message.entities or message.caption_entities or []
     for entity in entities:
-        if entity.type in {'text_link', 'url', 'mention'}:
+        if entity.type in {'text_link', 'url', 'mention', 'custom_emoji'}:
             return True
     return False
 
@@ -182,7 +211,7 @@ async def processChatMsg(message: types.Message):
 
     key = str(chat.id) + '_' + str(user.id)
 
-    if checkRegex(text) or message.reply_markup or hasLinks(message):
+    if checkRegex(text) or message.reply_markup or checkEntities(message):
         await bot.ban_chat_member(chat_id=chat.id, user_id=user.id)
         if not message.reply_markup:
             await message.forward(admin_id)
