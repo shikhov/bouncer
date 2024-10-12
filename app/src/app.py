@@ -202,7 +202,7 @@ async def processMsg(message: types.Message):
 
     key = str(message.chat.id) + '_' + str(message.from_user.id)
 
-    if checkRegex(text) or message.reply_markup or checkEntities(message):
+    if message.reply_markup or checkEntities(message) or checkRegex(text):
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
         if not message.reply_markup:
             await message.forward(ADMINCHATID)
