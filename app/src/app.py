@@ -41,13 +41,14 @@ def processRegexList(regex_list):
 
 
 def loadSettings():
-    global TOKEN, ADMINCHATID, REGEX_LIST, ALLOWED_CHATS
+    global TOKEN, ADMINCHATID, REGEX_LIST_SOURCE, REGEX_LIST, ALLOWED_CHATS
 
     settings = db.settings.find_one({'_id': 'settings'})
 
     TOKEN = settings['TOKEN']
     ADMINCHATID = settings['ADMINCHATID']
-    REGEX_LIST = processRegexList(settings['REGEX_LIST'])
+    REGEX_LIST_SOURCE = settings['REGEX_LIST']
+    REGEX_LIST = processRegexList(REGEX_LIST_SOURCE)
     ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
 
 
@@ -74,7 +75,7 @@ def checkRegex(text):
             flags = re.IGNORECASE + re.ASCII
 
         if re.search(regex, text, flags):
-            return True
+            return regex
 
     return False
 
@@ -202,7 +203,15 @@ async def processMsg(message: types.Message):
 
     key = str(message.chat.id) + '_' + str(message.from_user.id)
 
-    if message.reply_markup or checkEntities(message) or checkRegex(text):
+    is_spam = False
+    if message.reply_markup or checkEntities(message):
+        is_spam = True
+    else:
+        regex_result = checkRegex(text)
+        if regex_result:
+            is_spam = True
+
+    if is_spam:
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
         if not message.reply_markup:
             await message.forward(ADMINCHATID)
@@ -211,6 +220,14 @@ async def processMsg(message: types.Message):
         await message.delete()
         db.users.delete_one({'_id': key})
         usersCache.pop(key)
+
+        if regex_result:
+            regex = REGEX_LIST_SOURCE[REGEX_LIST.index(regex_result)]
+            stat = db.settings.find_one({'_id': 'stat'})
+            if regex not in stat['regex']:
+                stat['regex'][regex] = 0
+            stat['regex'][regex] += 1
+            db.settings.update_one({'_id': 'stat'}, {'$set': stat})
     else:
         db.users.update_one({'_id' : key}, {'$set': {'islegal': True}})
         usersCache[key] = True
