@@ -220,17 +220,17 @@ async def processMsg(message: types.Message):
         await message.delete()
         db.users.delete_one({'_id': key})
         usersCache.pop(key)
-
-        if regex_result:
-            regex = REGEX_LIST_SOURCE[REGEX_LIST.index(regex_result)]
-            stat = db.settings.find_one({'_id': 'stat'})
-            if regex not in stat['regex']:
-                stat['regex'][regex] = 0
-            stat['regex'][regex] += 1
-            db.settings.update_one({'_id': 'stat'}, {'$set': stat})
+        updateStat(regex_result)
     else:
         db.users.update_one({'_id' : key}, {'$set': {'islegal': True}})
         usersCache[key] = True
+
+def updateStat(regex_result):
+    if not regex_result: return
+    regex = REGEX_LIST_SOURCE[REGEX_LIST.index(regex_result)]
+    stat = db.settings.find_one({'_id': 'stat'})
+    stat['regex'][regex] = stat['regex'].get(regex, 0) + 1
+    db.settings.update_one({'_id': 'stat'}, {'$set': stat})
 
 
 async def main():
