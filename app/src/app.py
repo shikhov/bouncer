@@ -86,6 +86,8 @@ def loadSettings():
     ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
 
 
+FORBIDDEN_ENTITIES = {'text_link', 'url', 'mention', 'custom_emoji'}
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
@@ -104,7 +106,7 @@ router = Router()
 def checkEntities(message: types.Message):
     entities = message.entities or message.caption_entities or []
     for entity in entities:
-        if entity.type in {'text_link', 'url', 'mention', 'custom_emoji'}:
+        if entity.type in FORBIDDEN_ENTITIES:
             return True
     return False
 
