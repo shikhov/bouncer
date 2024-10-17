@@ -12,37 +12,34 @@ db = MongoClient(CONNSTRING).get_database(DBNAME)
 
 
 class RegexChecker:
-    DEFAULT_FLAGS = re.IGNORECASE + re.UNICODE
-    SUBS = {
-        'а': 'a',
-        'к': 'k',
-        'и': 'u',
-        'р': 'p',
-        'о': 'o0',
-        'е': 'ёe',
-        'т': 't',
-        'с': 'c',
-        'н': 'h',
-        'в': 'b',
-        'з': '3',
-        'у': 'y',
-        'х': 'x'
-    }
-    rlist = {}
-    matched_regex = None
-
     def __init__(self) -> None:
-        pass
+        self.rlist = {}
+        self.matched_regex = None
 
     def load_list(self, regex_list):
+        SUBS = {
+            'а': 'a',
+            'к': 'k',
+            'и': 'u',
+            'р': 'p',
+            'о': 'o0',
+            'е': 'ёe',
+            'т': 't',
+            'с': 'c',
+            'н': 'h',
+            'в': 'b',
+            'з': '3',
+            'у': 'y',
+            'х': 'x'
+        }
         tmp = {}
         stat = db.settings.find_one({'_id': 'stat'})
 
         for regex in regex_list:
             out_regex = ''
             for char in regex:
-                if char in self.SUBS:
-                    out_regex += '[' + char + self.SUBS[char] + ']'
+                if char in SUBS:
+                    out_regex += '[' + char + SUBS[char] + ']'
                 else:
                     out_regex += char
             tmp[regex] = {
@@ -58,7 +55,7 @@ class RegexChecker:
         if not text: return False
         for key, value in self.rlist.items():
             regex = value['regex']
-            flags = value.get('flags', self.DEFAULT_FLAGS)
+            flags = value.get('flags', re.IGNORECASE + re.UNICODE)
             if re.search(regex, text, flags):
                 self.matched_regex = key
                 return True
