@@ -83,6 +83,15 @@ def loadSettings():
     ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
 
 
+def initServiceData():
+    stat = db.settings.find_one({'_id': 'stat'})
+    if not stat:
+        stat_data = {
+            'regex': {}
+        }
+        db.settings.update_one({'_id': 'stat'}, {'$set': stat_data}, upsert=True)
+
+
 FORBIDDEN_ENTITIES = {'text_link', 'url', 'mention', 'custom_emoji'}
 
 # Configure logging
@@ -90,6 +99,9 @@ logging.basicConfig(level=logging.INFO)
 
 regexChecker = RegexChecker()
 usersCache = {}
+
+# service data
+initServiceData()
 
 # settings
 loadSettings()
