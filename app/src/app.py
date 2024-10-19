@@ -5,6 +5,7 @@ import asyncio
 from aiogram import Bot, Dispatcher, Router, F, types
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, JOIN_TRANSITION
+from aiogram.utils.text_decorations import html_decoration as hd
 from pymongo import MongoClient
 
 from config import CONNSTRING, DBNAME
@@ -239,7 +240,7 @@ async def processMsg(message: types.Message):
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
         if not message.reply_markup:
             await message.forward(ADMINCHATID)
-            await bot.send_message(ADMINCHATID, '💩 Spam from user: ' + message.from_user.full_name + '\n' + key)
+            await bot.send_message(ADMINCHATID, '💩 Spam from user: ' + hd.quote(message.from_user.full_name) + '\n' + key)
 
         await message.delete()
         db.users.delete_one({'_id': key})
