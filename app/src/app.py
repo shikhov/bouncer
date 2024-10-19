@@ -122,7 +122,9 @@ def checkEntities(message: types.Message):
 
 
 def isUserLegal(message: types.Message):
-    key = str(message.chat.id) + '_' + str(message.from_user.id)
+    chat = message.chat
+    user = message.from_user
+    key = f'{chat.id}_{user.id}'
     if key in usersCache:
         return usersCache[key]
 
@@ -130,10 +132,10 @@ def isUserLegal(message: types.Message):
     if not doc:
         doc = {
                 '_id': key,
-                'first_name': message.from_user.first_name,
-                'last_name': message.from_user.last_name,
-                'username': message.from_user.username,
-                'chat_title': message.chat.title,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'username': user.username,
+                'chat_title': chat.title,
                 'islegal': True
             }
         db.users.insert_one(doc)
@@ -167,7 +169,7 @@ async def processJoin(event: types.ChatMemberUpdated):
 
     user = event.new_chat_member.user
     chat = event.chat
-    docid = str(chat.id) + '_' + str(user.id)
+    docid = f'{chat.id}_{user.id}'
     data = {
             '_id': docid,
             'first_name': user.first_name,
@@ -220,8 +222,12 @@ async def processCmdReload(message: types.Message):
 @router.message(F.chat.type != 'private')
 async def processMsg(message: types.Message):
     if not await isChatAllowed(message.chat): return
-    if message.from_user.id == ADMINCHATID: return
-    if message.from_user.id == bot.id: return
+
+    chat = message.chat
+    user = message.from_user
+
+    if user.id == ADMINCHATID: return
+    if user.id == bot.id: return
 
     if message.sender_chat:
         await message.delete()
@@ -234,13 +240,13 @@ async def processMsg(message: types.Message):
     if not (text or message.reply_markup):
         return
 
-    key = str(message.chat.id) + '_' + str(message.from_user.id)
+    key = f'{chat.id}_{user.id}'
 
     if message.reply_markup or checkEntities(message) or regexChecker.check(text):
-        await bot.ban_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
+        await bot.ban_chat_member(chat_id=chat.id, user_id=user.id)
         if not message.reply_markup:
             await message.forward(ADMINCHATID)
-            await bot.send_message(ADMINCHATID, '💩 Spam from user: ' + hd.quote(message.from_user.full_name) + '\n' + key)
+            await bot.send_message(ADMINCHATID, f'💩 Spam from user: {hd.quote(user.full_name)}\n{key}')
 
         await message.delete()
         db.users.delete_one({'_id': key})
