@@ -1,6 +1,7 @@
 import logging
 import re
 import asyncio
+from datetime import datetime
 
 from aiogram import Bot, Dispatcher, Router, F, types
 from aiogram.exceptions import TelegramBadRequest
@@ -63,13 +64,12 @@ class RegexChecker:
 
         return False
 
-    def updateStat(self):
-        if not self.matched_regex: return
+    def updateStat(self, stat):
+        if not self.matched_regex:
+            return
         self.rlist[self.matched_regex]['count'] += 1
         self.rlist = dict(sorted(self.rlist.items(), key=lambda item: item[1]['count'], reverse=True))
-        stat = db.settings.find_one({'_id': 'stat'})
         stat['regex'][self.matched_regex] = stat['regex'].get(self.matched_regex, 0) + 1
-        db.settings.update_one({'_id': 'stat'}, {'$set': stat})
         self.matched_regex = None
 
 
@@ -88,7 +88,8 @@ def initServiceData():
     stat = db.settings.find_one({'_id': 'stat'})
     if not stat:
         stat_data = {
-            'regex': {}
+            'regex': {},
+            'daily': {}
         }
         db.settings.update_one({'_id': 'stat'}, {'$set': stat_data}, upsert=True)
 
@@ -219,26 +220,25 @@ async def processCmdReload(message: types.Message):
     await message.answer('Settings sucessfully reloaded')
 
 
-@router.message(F.chat.type != 'private')
-async def processMsg(message: types.Message):
-    if not await isChatAllowed(message.chat): return
-
+async def checkForSpam(message: types.Message):
     chat = message.chat
     user = message.from_user
 
-    if user.id == ADMINCHATID: return
-    if user.id == bot.id: return
+    if user.id == ADMINCHATID:
+        return False
+    if user.id == bot.id:
+        return False
 
     if message.sender_chat:
         await message.delete()
-        return
+        return True
 
     if isUserLegal(message):
-        return
+        return False
 
     text = message.text or message.caption
     if not (text or message.reply_markup):
-        return
+        return False
 
     key = f'{chat.id}_{user.id}'
 
@@ -251,10 +251,24 @@ async def processMsg(message: types.Message):
         await message.delete()
         db.users.delete_one({'_id': key})
         usersCache.pop(key)
-        regexChecker.updateStat()
-    else:
-        db.users.update_one({'_id' : key}, {'$set': {'islegal': True}})
-        usersCache[key] = True
+        return True
+
+    db.users.update_one({'_id' : key}, {'$set': {'islegal': True}})
+    usersCache[key] = True
+    return False
+
+
+@router.message(F.chat.type != 'private')
+async def processMsg(message: types.Message):
+    if not await isChatAllowed(message.chat):
+        return
+
+    if await checkForSpam(message):
+        stat = db.settings.find_one({'_id': 'stat'})
+        today = str(datetime.today().date())
+        stat['daily'][today] = stat['daily'].get(today, 0) + 1
+        regexChecker.updateStat(stat)
+        db.settings.update_one({'_id': 'stat'}, {'$set': stat})
 
 
 async def main():
