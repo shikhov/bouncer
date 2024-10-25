@@ -85,13 +85,17 @@ def loadSettings():
 
 
 def initServiceData():
+    stat_struct = {
+        'regex': {},
+        'daily': {}
+    }
     stat = db.settings.find_one({'_id': 'stat'})
-    if not stat:
-        stat_data = {
-            'regex': {},
-            'daily': {}
-        }
-        db.settings.update_one({'_id': 'stat'}, {'$set': stat_data}, upsert=True)
+    if stat:
+        for key, value in stat_struct.items():
+            stat[key] = stat.get(key, value)
+    else:
+        stat = stat_struct
+    db.settings.update_one({'_id': 'stat'}, {'$set': stat}, upsert=True)
 
 
 FORBIDDEN_ENTITIES = {'text_link', 'url', 'mention', 'custom_emoji'}
