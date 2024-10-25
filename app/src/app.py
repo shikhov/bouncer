@@ -262,18 +262,22 @@ async def checkForSpam(message: types.Message):
     return False
 
 
+def updateStat(chat_id):
+    stat = db.settings.find_one({'_id': 'stat'})
+    today = str(datetime.today().date())
+    stat['daily'][chat_id] = stat['daily'].get(chat_id, {})
+    stat['daily'][chat_id][today] = stat['daily'][chat_id].get(today, 0) + 1
+    regexChecker.updateStat(stat)
+    db.settings.update_one({'_id': 'stat'}, {'$set': stat})
+
+
 @router.message(F.chat.type != 'private')
 async def processMsg(message: types.Message):
     if not await isChatAllowed(message.chat):
         return
 
     if await checkForSpam(message):
-        stat = db.settings.find_one({'_id': 'stat'})
-        today = str(datetime.today().date())
-        stat['daily'][today] = stat['daily'].get(today, 0) + 1
-        regexChecker.updateStat(stat)
-        db.settings.update_one({'_id': 'stat'}, {'$set': stat})
-
+        updateStat(str(message.chat.id))
 
 async def main():
     dp.include_router(router)
