@@ -101,7 +101,7 @@ def initServiceData():
 FORBIDDEN_ENTITIES = {'text_link', 'url', 'mention', 'custom_emoji'}
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 regexChecker = RegexChecker()
 usersCache = {}
