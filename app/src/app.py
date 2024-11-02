@@ -18,7 +18,7 @@ class RegexChecker:
         self.rlist = {}
         self.matched_regex = None
 
-    def load_list(self, regex_list):
+    def load_list(self, regex_list, stat):
         SUBS = {
             'а': 'a',
             'к': 'k',
@@ -35,7 +35,6 @@ class RegexChecker:
             'х': 'x'
         }
         tmp = {}
-        stat = db.settings.find_one({'_id': 'stat'})
 
         for regex in regex_list:
             out_regex = ''
@@ -80,8 +79,10 @@ def loadSettings():
 
     TOKEN = settings['TOKEN']
     ADMINCHATID = settings['ADMINCHATID']
-    regexChecker.load_list(settings['REGEX_LIST'])
     ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
+
+    stat = db.settings.find_one({'_id': 'stat'})
+    regexChecker.load_list(settings['REGEX_LIST'], stat)
 
 
 def initServiceData():
