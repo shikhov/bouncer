@@ -6,7 +6,7 @@ class RegexChecker:
         self.rlist = {}
         self.matched_regex = None
 
-    def load_list(self, regex_list, stat):
+    def load_list(self, regex_list, stat=None):
         SUBS = {
             'а': 'a',
             'к': 'k',
@@ -33,7 +33,7 @@ class RegexChecker:
                     out_regex += char
             tmp[regex] = {
                 'regex': out_regex,
-                'count': stat['regex'].get(regex, 0)
+                'count': stat['regex'].get(regex, 0) if stat else 0
             }
             if regex.startswith(r'[\u'):
                 tmp[regex]['flags'] = re.IGNORECASE + re.ASCII

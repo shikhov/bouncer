@@ -25,14 +25,13 @@ def do_test():
     db = MongoClient(CONNSTRING).get_database(DBNAME)
     settings = db.settings.find_one({'_id': 'settings'})
     regexChecker = RegexChecker()
-    regexChecker.load_list(settings['REGEX_LIST'], {'regex': {}})
+    regexChecker.load_list(settings['REGEX_LIST'])
 
     pass_count = 0
     fail_count = 0
 
     for text, expectation in test_data.items():
-        result = regexChecker.check(text)
-        if result == expectation:
+        if regexChecker.check(text) == expectation:
             pass_count += 1
             regex = f'{C_CYAN} {regexChecker.matched_regex}{C_ENDC}' if regexChecker.matched_regex else ''
             print(f'{C_GREEN}PASS:{C_ENDC}{regex} {text}')
