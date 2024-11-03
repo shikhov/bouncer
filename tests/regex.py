@@ -3,8 +3,9 @@ import sys
 
 sys.path.append('app\\src')
 sys.path.append('config')
+sys.path.append('test_data')
 from regex_checker import RegexChecker
-from test_data.regex_test_data import test_data
+from regex_test_data import test_data
 from config_prod import CONNSTRING, DBNAME
 
 C_HEADER = '\033[95m'
