@@ -38,6 +38,7 @@ def do_test():
         else:
             fail_count += 1
             print(f'{C_FAIL}FAIL:{C_ENDC} {text}')
+        regexChecker.matched_regex = None
 
     failed = f'FAILED: {C_FAIL}{fail_count}{C_ENDC}' if fail_count else f'FAILED: {C_GREEN}{fail_count}{C_ENDC}'
     passed = f'PASSED: {C_GREEN}{pass_count}{C_ENDC}'
