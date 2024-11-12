@@ -15,13 +15,16 @@ db = MongoClient(CONNSTRING).get_database(DBNAME)
 
 
 def loadSettings():
-    global TOKEN, ADMINCHATID, ALLOWED_CHATS
+    global TOKEN, ADMINCHATID, LOGCHATID, ALLOWED_CHATS
 
     settings = db.settings.find_one({'_id': 'settings'})
 
     TOKEN = settings['TOKEN']
     ADMINCHATID = settings['ADMINCHATID']
+    LOGCHATID = settings.get('LOGCHATID', ADMINCHATID)
     ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
+    if not ALLOWED_CHATS:
+        logging.warning('ALLOWED_CHATS is empty! It is recommended to fill in this field')
 
     stat = db.settings.find_one({'_id': 'stat'})
     regexChecker.load_list(settings['REGEX_LIST'], stat)
@@ -93,9 +96,14 @@ def isUserLegal(message: types.Message):
 
 
 async def isChatAllowed(chat: types.Chat):
-    if not ALLOWED_CHATS: return True
-    if chat.id in ALLOWED_CHATS: return True
-    if chat.type == 'private': return True
+    if chat.id == LOGCHATID:
+        return False
+    if not ALLOWED_CHATS:
+        return True
+    if chat.id in ALLOWED_CHATS:
+        return True
+    if chat.type == 'private':
+        return True
 
     logging.info(f'chat id {chat.id} is not allowed! Leaving chat')
     try:
@@ -107,13 +115,15 @@ async def isChatAllowed(chat: types.Chat):
 
 @router.message(F.new_chat_members)
 async def removeJoinMessage(message: types.Message):
-    if not await isChatAllowed(message.chat): return
+    if not await isChatAllowed(message.chat):
+        return
     await message.delete()
 
 
 @router.chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
 async def processJoin(event: types.ChatMemberUpdated):
-    if not await isChatAllowed(event.chat): return
+    if not await isChatAllowed(event.chat):
+        return
 
     user = event.new_chat_member.user
     chat = event.chat
@@ -136,7 +146,7 @@ async def processJoin(event: types.ChatMemberUpdated):
     usersCache[docid] = data['islegal']
 
 
-@router.message((F.text.lower() == 'unban') & (F.chat.id == ADMINCHATID))
+@router.message((F.text.lower() == 'unban') & (F.chat.id == LOGCHATID))
 async def processCmdUnban(message: types.Message):
     if not (message.reply_to_message and message.reply_to_message.text):
         await message.answer('⚠ You must reply to message to use this command')
@@ -192,8 +202,8 @@ async def checkForSpam(message: types.Message):
     if message.reply_markup or checkEntities(message) or regexChecker.check(text):
         await bot.ban_chat_member(chat_id=chat.id, user_id=user.id)
         if not message.reply_markup:
-            await message.forward(ADMINCHATID)
-            await bot.send_message(ADMINCHATID, f'💩 Spam from user: {hd.quote(user.full_name)}\n{key}')
+            await message.forward(LOGCHATID)
+            await bot.send_message(LOGCHATID, f'💩 Spam from user: {hd.quote(user.full_name)}\n{key}')
 
         await message.delete()
         db.users.delete_one({'_id': key})
