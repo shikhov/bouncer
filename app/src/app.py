@@ -72,9 +72,7 @@ def checkEntities(message: types.Message):
     return False
 
 
-def isUserLegal(message: types.Message):
-    chat = message.chat
-    user = message.from_user
+def isUserLegal(user: types.User, chat: types.Chat):
     key = f'{chat.id}_{user.id}'
     if key in usersCache:
         return usersCache[key]
@@ -190,7 +188,7 @@ async def checkForSpam(message: types.Message):
         await message.delete()
         return True
 
-    if isUserLegal(message):
+    if isUserLegal(user, chat):
         return False
 
     text = message.text or message.caption
