@@ -53,6 +53,7 @@ def initServiceData():
 
 
 FORBIDDEN_ENTITIES = {'text_link', 'url', 'mention', 'custom_emoji'}
+HASHTAG = '#bouncer'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -209,7 +210,7 @@ async def checkForSpam(message: types.Message):
         await bot.ban_chat_member(chat_id=chat.id, user_id=user.id)
         if not message.reply_markup:
             await message.forward(LOGCHATID)
-            await bot.send_message(LOGCHATID, f'💩 Spam from user: {hd.quote(user.full_name)}\n{key}')
+            await bot.send_message(LOGCHATID, f'{HASHTAG}\n💩 Spam from user: {hd.quote(user.full_name)}\n{key}')
 
         await message.delete()
         db.users.delete_one({'_id': key})
@@ -241,7 +242,7 @@ async def processJoinRequest(update: types.ChatJoinRequest):
     builder.adjust(4, 4)
     text = f'Для вступления в чат "{chat.title}" нажмите на значок, соответствующий тематике чата'
     await bot.send_message(chat_id=update.user_chat_id, text=text, reply_markup=builder.as_markup())
-    await bot.send_message(LOGCHATID, f'{logname} wants to join {chat.title}')
+    await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} wants to join {chat.title}')
 
 
 @router.callback_query()
@@ -254,7 +255,7 @@ async def callbackHandler(query: types.CallbackQuery):
         await bot.approve_chat_join_request(chat_id=chat_id, user_id=user.id)
         kb = InlineKeyboardBuilder().button(text='Перейти', url='https://t.me/' + chat_username)
         await bot.edit_message_text(SUCCESS_TEXT, chat_id=user.id, message_id=msg_id, reply_markup=kb.as_markup())
-        await bot.send_message(LOGCHATID, f'{logname} succeeded')
+        await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} succeeded')
         docid = f'{chat_id}_{user.id}'
         doc = {
                 '_id': docid,
@@ -269,7 +270,7 @@ async def callbackHandler(query: types.CallbackQuery):
     else:
         await bot.edit_message_text(FAIL_TEXT, chat_id=user.id, message_id=msg_id)
         await bot.decline_chat_join_request(chat_id=chat_id, user_id=query.from_user.id)
-        await bot.send_message(LOGCHATID, f'{logname} failed')
+        await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} failed')
 
 
 @router.message(F.chat.type != 'private')
