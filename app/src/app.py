@@ -19,7 +19,7 @@ db = MongoClient(CONNSTRING).get_database(DBNAME)
 
 def loadSettings():
     global TOKEN, ADMINCHATID, LOGCHATID, ALLOWED_CHATS, EMOJI_LIST, RIGHT_ANSWER
-    global SUCCESS_TEXT, FAIL_TEXT
+    global WELCOME_TEXT, SUCCESS_TEXT, FAIL_TEXT, ERROR_TEXT, TIMEOUT_TEXT, CAPTCHA_TIMEOUT
 
     settings = db.settings.find_one({'_id': 'settings'})
 
@@ -29,8 +29,12 @@ def loadSettings():
     ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
     EMOJI_LIST = list(settings['EMOJI_LIST'])
     RIGHT_ANSWER = EMOJI_LIST[0]
+    WELCOME_TEXT = settings['WELCOME_TEXT']
     SUCCESS_TEXT = settings['SUCCESS_TEXT']
     FAIL_TEXT = settings['FAIL_TEXT']
+    ERROR_TEXT = settings['ERROR_TEXT']
+    TIMEOUT_TEXT = settings['TIMEOUT_TEXT']
+    CAPTCHA_TIMEOUT = settings['CAPTCHA_TIMEOUT']
     if not ALLOWED_CHATS:
         logging.warning('ALLOWED_CHATS is empty! It is recommended to fill in this field')
 
@@ -240,9 +244,15 @@ async def processJoinRequest(update: types.ChatJoinRequest):
     for emoji in random.sample(EMOJI_LIST, len(EMOJI_LIST)):
         builder.button(text=emoji, callback_data=f'{emoji}#{chat.id}#{chat.username}')
     builder.adjust(4, 4)
-    text = f'Для вступления в чат "{chat.title}" нажмите на значок, соответствующий тематике чата'
-    await bot.send_message(chat_id=update.user_chat_id, text=text, reply_markup=builder.as_markup())
+    text = WELCOME_TEXT.replace('%CHAT_TITLE%', chat.title)
+    message = await bot.send_message(chat_id=update.user_chat_id, text=text, reply_markup=builder.as_markup())
     await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} wants to join {chat.title}')
+    await asyncio.sleep(CAPTCHA_TIMEOUT)
+    try:
+        await bot.decline_chat_join_request(chat_id=chat.id, user_id=user.id)
+        await message.edit_text(TIMEOUT_TEXT)
+    except Exception:
+        pass
 
 
 @router.callback_query()
@@ -252,7 +262,12 @@ async def callbackHandler(query: types.CallbackQuery):
     logname = f'{hd.quote(user.full_name)} (@{user.username})' if user.username else hd.quote(user.full_name)
     (answer, chat_id, chat_username) = query.data.split('#')
     if answer == RIGHT_ANSWER:
-        await bot.approve_chat_join_request(chat_id=chat_id, user_id=user.id)
+        try:
+            await bot.approve_chat_join_request(chat_id=chat_id, user_id=user.id)
+        except Exception:
+            await bot.edit_message_text(ERROR_TEXT, chat_id=user.id, message_id=msg_id)
+            return
+
         kb = InlineKeyboardBuilder().button(text='Перейти', url='https://t.me/' + chat_username)
         await bot.edit_message_text(SUCCESS_TEXT, chat_id=user.id, message_id=msg_id, reply_markup=kb.as_markup())
         await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} succeeded')
@@ -269,8 +284,11 @@ async def callbackHandler(query: types.CallbackQuery):
         usersCache[docid] = True
     else:
         await bot.edit_message_text(FAIL_TEXT, chat_id=user.id, message_id=msg_id)
-        await bot.decline_chat_join_request(chat_id=chat_id, user_id=query.from_user.id)
-        await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} failed')
+        try:
+            await bot.decline_chat_join_request(chat_id=chat_id, user_id=query.from_user.id)
+            await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} failed')
+        except Exception:
+            pass
 
 
 @router.message(F.chat.type != 'private')
