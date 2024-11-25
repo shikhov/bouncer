@@ -1,6 +1,7 @@
 import logging
 import re
 import asyncio
+import os
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher, Router, F, types
@@ -13,8 +14,11 @@ import random
 from pymongo import MongoClient
 
 from regex_checker import RegexChecker
-from config import CONNSTRING, DBNAME
-db = MongoClient(CONNSTRING).get_database(DBNAME)
+import config
+
+connstring = config.CONNSTRING or os.getenv('connstring')
+dbname = config.DBNAME or os.getenv('dbname')
+db = MongoClient(connstring).get_database(dbname)
 
 
 def loadSettings():

@@ -1,2 +1,2 @@
-DBNAME = 'bouncer'
+DBNAME = ''
 CONNSTRING = ''
