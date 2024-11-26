@@ -241,6 +241,8 @@ def updateStat(chat_id):
 
 @router.chat_join_request()
 async def processJoinRequest(update: types.ChatJoinRequest):
+    if not await isChatAllowed(update.chat):
+        return
     chat = update.chat
     user = update.from_user
     logname = f'{hd.quote(user.full_name)} (@{user.username})' if user.username else hd.quote(user.full_name)
@@ -254,9 +256,9 @@ async def processJoinRequest(update: types.ChatJoinRequest):
     await asyncio.sleep(CAPTCHA_TIMEOUT)
     try:
         await bot.decline_chat_join_request(chat_id=chat.id, user_id=user.id)
-        await message.edit_text(TIMEOUT_TEXT)
     except Exception:
         pass
+    await message.edit_text(TIMEOUT_TEXT)
 
 
 @router.callback_query()
@@ -290,9 +292,10 @@ async def callbackHandler(query: types.CallbackQuery):
         await bot.edit_message_text(FAIL_TEXT, chat_id=user.id, message_id=msg_id)
         try:
             await bot.decline_chat_join_request(chat_id=chat_id, user_id=query.from_user.id)
-            await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} failed')
         except Exception:
-            pass
+            return
+        await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} failed')
+
 
 
 @router.message(F.chat.type != 'private')
