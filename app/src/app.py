@@ -257,7 +257,7 @@ async def processJoinRequest(update: types.ChatJoinRequest):
     try:
         await bot.decline_chat_join_request(chat_id=chat.id, user_id=user.id)
     except Exception:
-        pass
+        return
     await message.edit_text(TIMEOUT_TEXT)
 
 
