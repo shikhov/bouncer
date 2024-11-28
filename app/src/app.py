@@ -24,6 +24,7 @@ db = MongoClient(connstring).get_database(dbname)
 def loadSettings():
     global TOKEN, ADMINCHATID, LOGCHATID, ALLOWED_CHATS, EMOJI_LIST, RIGHT_ANSWER
     global WELCOME_TEXT, SUCCESS_TEXT, FAIL_TEXT, ERROR_TEXT, TIMEOUT_TEXT, CAPTCHA_TIMEOUT
+    global EMOJI_ROWSIZE
 
     settings = db.settings.find_one({'_id': 'settings'})
 
@@ -33,6 +34,7 @@ def loadSettings():
     ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
     EMOJI_LIST = list(settings['EMOJI_LIST'])
     RIGHT_ANSWER = EMOJI_LIST[0]
+    EMOJI_ROWSIZE = settings['EMOJI_ROWSIZE']
     WELCOME_TEXT = settings['WELCOME_TEXT']
     SUCCESS_TEXT = settings['SUCCESS_TEXT']
     FAIL_TEXT = settings['FAIL_TEXT']
@@ -249,7 +251,7 @@ async def processJoinRequest(update: types.ChatJoinRequest):
     builder = InlineKeyboardBuilder()
     for emoji in random.sample(EMOJI_LIST, len(EMOJI_LIST)):
         builder.button(text=emoji, callback_data=f'{emoji}#{chat.id}#{chat.username}')
-    builder.adjust(4, 4)
+    builder.adjust(EMOJI_ROWSIZE)
     text = WELCOME_TEXT.replace('%CHAT_TITLE%', chat.title)
     message = await bot.send_message(chat_id=update.user_chat_id, text=text, reply_markup=builder.as_markup())
     await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} wants to join {chat.title}')
