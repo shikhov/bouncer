@@ -20,20 +20,51 @@ connstring = config.CONNSTRING or os.getenv('connstring')
 dbname = config.DBNAME or os.getenv('dbname')
 db = MongoClient(connstring).get_database(dbname)
 
+class Group:
+    def __init__(self, chat_id=None, chat=None):
+        if chat_id:
+            if isinstance(chat_id, str):
+                data = GROUPS[int(chat_id)]
+            else:
+                data = GROUPS[chat_id]
+        elif chat:
+            data = GROUPS[chat.id]
+        else:
+            raise('Error object initialization')
+
+        self.emoji_list = list(data.get('emoji_list', EMOJI_LIST))
+        self.emoji_rowsize = data.get('emoji_rowsize', EMOJI_ROWSIZE)
+        self.welcome_text = data.get('welcome_text', WELCOME_TEXT)
+        self.success_text = data.get('success_text', SUCCESS_TEXT)
+        self.fail_text = data.get('fail_text', FAIL_TEXT)
+        self.error_text = data.get('error_text', ERROR_TEXT)
+        self.timeout_text = data.get('timeout_text', TIMEOUT_TEXT)
+        self.captcha_timeout = data.get('captcha_timeout', CAPTCHA_TIMEOUT)
+        self.logchatid = data.get('logchatid', LOGCHATID)
+
+        if chat:
+            self.welcome_text = self.welcome_text.replace('%CHAT_TITLE%', chat.title)
+
+    def random_emoji(self):
+        return random.sample(self.emoji_list, len(self.emoji_list))
+
+    def is_right_answer(self, answer):
+        return answer == self.emoji_list[0]
+
 
 def loadSettings():
-    global TOKEN, ADMINCHATID, LOGCHATID, ALLOWED_CHATS, EMOJI_LIST, RIGHT_ANSWER
+    global TOKEN, ADMINCHATID, LOGCHATID, GROUPS, EMOJI_LIST
     global WELCOME_TEXT, SUCCESS_TEXT, FAIL_TEXT, ERROR_TEXT, TIMEOUT_TEXT, CAPTCHA_TIMEOUT
-    global EMOJI_ROWSIZE
+    global EMOJI_ROWSIZE, HASHTAG
 
     settings = db.settings.find_one({'_id': 'settings'})
 
     TOKEN = settings['TOKEN']
     ADMINCHATID = settings['ADMINCHATID']
     LOGCHATID = settings.get('LOGCHATID', ADMINCHATID)
-    ALLOWED_CHATS = set(settings.get('ALLOWED_CHATS', {}))
-    EMOJI_LIST = list(settings['EMOJI_LIST'])
-    RIGHT_ANSWER = EMOJI_LIST[0]
+    HASHTAG = settings['HASHTAG']
+    GROUPS = {chat['id']: chat for chat in settings['GROUPS']}
+    EMOJI_LIST = settings['EMOJI_LIST']
     EMOJI_ROWSIZE = settings['EMOJI_ROWSIZE']
     WELCOME_TEXT = settings['WELCOME_TEXT']
     SUCCESS_TEXT = settings['SUCCESS_TEXT']
@@ -41,8 +72,6 @@ def loadSettings():
     ERROR_TEXT = settings['ERROR_TEXT']
     TIMEOUT_TEXT = settings['TIMEOUT_TEXT']
     CAPTCHA_TIMEOUT = settings['CAPTCHA_TIMEOUT']
-    if not ALLOWED_CHATS:
-        logging.warning('ALLOWED_CHATS is empty! It is recommended to fill in this field')
 
     stat = db.settings.find_one({'_id': 'stat'})
     regexChecker.load_list(settings['REGEX_LIST'], stat)
@@ -63,7 +92,6 @@ def initServiceData():
 
 
 FORBIDDEN_ENTITIES = {'text_link', 'url', 'mention', 'custom_emoji'}
-HASHTAG = '#bouncer'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -115,9 +143,7 @@ def isUserLegal(user: types.User, chat: types.Chat):
 async def isChatAllowed(chat: types.Chat):
     if chat.id == LOGCHATID:
         return False
-    if not ALLOWED_CHATS:
-        return True
-    if chat.id in ALLOWED_CHATS:
+    if chat.id in GROUPS:
         return True
     if chat.type == 'private':
         return True
@@ -247,20 +273,20 @@ async def processJoinRequest(update: types.ChatJoinRequest):
         return
     chat = update.chat
     user = update.from_user
+    group = Group(chat=chat)
     logname = f'{hd.quote(user.full_name)} (@{user.username})' if user.username else hd.quote(user.full_name)
     builder = InlineKeyboardBuilder()
-    for emoji in random.sample(EMOJI_LIST, len(EMOJI_LIST)):
+    for emoji in group.random_emoji():
         builder.button(text=emoji, callback_data=f'{emoji}#{chat.id}#{chat.username}')
-    builder.adjust(EMOJI_ROWSIZE)
-    text = WELCOME_TEXT.replace('%CHAT_TITLE%', chat.title)
-    message = await bot.send_message(chat_id=update.user_chat_id, text=text, reply_markup=builder.as_markup())
-    await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} wants to join {chat.title}')
-    await asyncio.sleep(CAPTCHA_TIMEOUT)
+    builder.adjust(group.emoji_rowsize)
+    message = await bot.send_message(user.id, group.welcome_text, reply_markup=builder.as_markup())
+    await bot.send_message(group.logchatid, f'{HASHTAG}\n{logname} wants to join {chat.title}')
+    await asyncio.sleep(group.captcha_timeout)
     try:
-        await bot.decline_chat_join_request(chat_id=chat.id, user_id=user.id)
+        await bot.decline_chat_join_request(chat.id, user.id)
     except Exception:
         return
-    await message.edit_text(TIMEOUT_TEXT)
+    await message.edit_text(group.timeout_text)
 
 
 @router.callback_query()
@@ -269,16 +295,17 @@ async def callbackHandler(query: types.CallbackQuery):
     msg_id = query.message.message_id
     logname = f'{hd.quote(user.full_name)} (@{user.username})' if user.username else hd.quote(user.full_name)
     (answer, chat_id, chat_username) = query.data.split('#')
-    if answer == RIGHT_ANSWER:
+    group = Group(chat_id=chat_id)
+    if group.is_right_answer(answer):
         try:
-            await bot.approve_chat_join_request(chat_id=chat_id, user_id=user.id)
+            await bot.approve_chat_join_request(chat_id, user.id)
         except Exception:
-            await bot.edit_message_text(ERROR_TEXT, chat_id=user.id, message_id=msg_id)
+            await bot.edit_message_text(group.error_text, user.id, msg_id)
             return
 
         kb = InlineKeyboardBuilder().button(text='Перейти', url='https://t.me/' + chat_username)
-        await bot.edit_message_text(SUCCESS_TEXT, chat_id=user.id, message_id=msg_id, reply_markup=kb.as_markup())
-        await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} succeeded')
+        await bot.edit_message_text(group.success_text, user.id, msg_id, reply_markup=kb.as_markup())
+        await bot.send_message(group.logchatid, f'{HASHTAG}\n{logname} succeeded')
         docid = f'{chat_id}_{user.id}'
         doc = {
                 '_id': docid,
@@ -291,13 +318,12 @@ async def callbackHandler(query: types.CallbackQuery):
         db.users.update_one({'_id': docid}, {'$set': doc}, upsert=True)
         usersCache[docid] = True
     else:
-        await bot.edit_message_text(FAIL_TEXT, chat_id=user.id, message_id=msg_id)
+        await bot.edit_message_text(group.fail_text, user.id, msg_id)
         try:
-            await bot.decline_chat_join_request(chat_id=chat_id, user_id=query.from_user.id)
+            await bot.decline_chat_join_request(chat_id, user.id)
         except Exception:
             return
-        await bot.send_message(LOGCHATID, f'{HASHTAG}\n{logname} failed')
-
+        await bot.send_message(group.logchatid, f'{HASHTAG}\n{logname} failed')
 
 
 @router.message(F.chat.type != 'private')
