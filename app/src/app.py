@@ -3,6 +3,7 @@ import re
 import asyncio
 import os
 from datetime import datetime
+import traceback
 
 from aiogram import Bot, Dispatcher, Router, F, types
 from aiogram.exceptions import TelegramBadRequest
@@ -57,24 +58,30 @@ def loadSettings():
     global WELCOME_TEXT, SUCCESS_TEXT, FAIL_TEXT, ERROR_TEXT, TIMEOUT_TEXT, CAPTCHA_TIMEOUT
     global EMOJI_ROWSIZE, HASHTAG
 
-    settings = db.settings.find_one({'_id': 'settings'})
+    try:
+        settings = db.settings.find_one({'_id': 'settings'})
 
-    TOKEN = settings['TOKEN']
-    ADMINCHATID = settings['ADMINCHATID']
-    LOGCHATID = settings.get('LOGCHATID', ADMINCHATID)
-    HASHTAG = settings['HASHTAG']
-    GROUPS = {chat['id']: chat for chat in settings['GROUPS']}
-    EMOJI_LIST = settings['EMOJI_LIST']
-    EMOJI_ROWSIZE = settings['EMOJI_ROWSIZE']
-    WELCOME_TEXT = settings['WELCOME_TEXT']
-    SUCCESS_TEXT = settings['SUCCESS_TEXT']
-    FAIL_TEXT = settings['FAIL_TEXT']
-    ERROR_TEXT = settings['ERROR_TEXT']
-    TIMEOUT_TEXT = settings['TIMEOUT_TEXT']
-    CAPTCHA_TIMEOUT = settings['CAPTCHA_TIMEOUT']
+        TOKEN = settings['TOKEN']
+        ADMINCHATID = settings['ADMINCHATID']
+        LOGCHATID = settings.get('LOGCHATID', ADMINCHATID)
+        HASHTAG = settings['HASHTAG']
+        GROUPS = {chat['id']: chat for chat in settings['GROUPS']}
+        EMOJI_LIST = settings['EMOJI_LIST']
+        EMOJI_ROWSIZE = settings['EMOJI_ROWSIZE']
+        WELCOME_TEXT = settings['WELCOME_TEXT']
+        SUCCESS_TEXT = settings['SUCCESS_TEXT']
+        FAIL_TEXT = settings['FAIL_TEXT']
+        ERROR_TEXT = settings['ERROR_TEXT']
+        TIMEOUT_TEXT = settings['TIMEOUT_TEXT']
+        CAPTCHA_TIMEOUT = settings['CAPTCHA_TIMEOUT']
 
-    stat = db.settings.find_one({'_id': 'stat'})
-    regexChecker.load_list(settings['REGEX_LIST'], stat)
+        stat = db.settings.find_one({'_id': 'stat'})
+        regexChecker.load_list(settings['REGEX_LIST'], stat)
+    except Exception:
+        traceback.print_exc()
+        return False
+
+    return True
 
 
 def initServiceData():
@@ -103,7 +110,8 @@ usersCache = {}
 initServiceData()
 
 # settings
-loadSettings()
+if not loadSettings():
+    exit()
 
 # Initialize bot and dispatcher
 bot = Bot(token=TOKEN, parse_mode='HTML')
@@ -216,7 +224,10 @@ async def processCmdUnban(message: types.Message):
 
 @router.message((F.text == '/reload') & (F.chat.id == ADMINCHATID))
 async def processCmdReload(message: types.Message):
-    loadSettings()
+    if not loadSettings():
+        await message.answer('Error!')
+        return
+
     await message.answer('Settings sucessfully reloaded')
 
 
