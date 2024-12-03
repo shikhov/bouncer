@@ -156,7 +156,7 @@ async def isChatAllowed(chat: types.Chat):
     if chat.type == 'private':
         return True
 
-    logging.info(f'chat id {chat.id} is not allowed! Leaving chat')
+    logging.warning(f'chat id {chat.id} ({chat.title}) is not allowed! Leaving chat')
     try:
         await bot.leave_chat(chat.id)
     except Exception:
