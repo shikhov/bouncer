@@ -42,6 +42,8 @@ class Group:
         self.timeout_text = data.get('timeout_text', TIMEOUT_TEXT)
         self.captcha_timeout = data.get('captcha_timeout', CAPTCHA_TIMEOUT)
         self.logchatid = data.get('logchatid', LOGCHATID)
+        self.postcaptcha_spamcheck = data.get('postcaptcha_spamcheck', POSTCAPTCHA_SPAMCHECK)
+        self.delete_joins = data.get('delete_joins', DELETE_JOINS)
 
         if chat:
             self.welcome_text = self.welcome_text.replace('%CHAT_TITLE%', chat.title)
@@ -56,7 +58,7 @@ class Group:
 def loadSettings():
     global TOKEN, ADMINCHATID, LOGCHATID, GROUPS, EMOJI_LIST
     global WELCOME_TEXT, SUCCESS_TEXT, FAIL_TEXT, ERROR_TEXT, TIMEOUT_TEXT, CAPTCHA_TIMEOUT
-    global EMOJI_ROWSIZE, HASHTAG
+    global EMOJI_ROWSIZE, HASHTAG, POSTCAPTCHA_SPAMCHECK, DELETE_JOINS
 
     try:
         settings = db.settings.find_one({'_id': 'settings'})
@@ -74,6 +76,8 @@ def loadSettings():
         ERROR_TEXT = settings['ERROR_TEXT']
         TIMEOUT_TEXT = settings['TIMEOUT_TEXT']
         CAPTCHA_TIMEOUT = settings['CAPTCHA_TIMEOUT']
+        POSTCAPTCHA_SPAMCHECK = settings['POSTCAPTCHA_SPAMCHECK']
+        DELETE_JOINS = settings['DELETE_JOINS']
 
         stat = db.settings.find_one({'_id': 'stat'})
         regexChecker.load_list(settings['REGEX_LIST'], stat)
@@ -165,8 +169,12 @@ async def isChatAllowed(chat: types.Chat):
 
 
 @router.message(F.new_chat_members)
-async def removeJoinMessage(message: types.Message):
+async def deleteJoinMessage(message: types.Message):
     if not await isChatAllowed(message.chat):
+        return
+
+    group = Group(chat=message.chat)
+    if not group.delete_joins:
         return
 
     try:
@@ -273,7 +281,8 @@ async def checkForSpam(message: types.Message):
     return False
 
 
-def updateStat(chat_id):
+def updateStat(message: types.Message):
+    chat_id = str(message.chat.id)
     stat = db.settings.find_one({'_id': 'stat'})
     today = str(datetime.today().date())
     stat['daily'][chat_id] = stat['daily'].get(chat_id, {})
@@ -328,7 +337,7 @@ async def callbackHandler(query: types.CallbackQuery):
                 'last_name': user.last_name,
                 'username': user.username,
                 'chat_title': chat_username,
-                'islegal': True
+                'islegal': not group.postcaptcha_spamcheck
             }
         db.users.update_one({'_id': docid}, {'$set': doc}, upsert=True)
         usersCache[docid] = True
@@ -347,7 +356,7 @@ async def processMsg(message: types.Message):
         return
 
     if await checkForSpam(message):
-        updateStat(str(message.chat.id))
+        updateStat(message)
 
 async def main():
     dp.include_router(router)
