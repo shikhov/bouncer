@@ -340,7 +340,7 @@ async def callbackHandler(query: types.CallbackQuery):
                 'islegal': not group.postcaptcha_spamcheck
             }
         db.users.update_one({'_id': docid}, {'$set': doc}, upsert=True)
-        usersCache[docid] = True
+        usersCache[docid] = not group.postcaptcha_spamcheck
     else:
         await bot.edit_message_text(group.fail_text, user.id, msg_id)
         try:
