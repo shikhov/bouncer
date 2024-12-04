@@ -168,7 +168,11 @@ async def isChatAllowed(chat: types.Chat):
 async def removeJoinMessage(message: types.Message):
     if not await isChatAllowed(message.chat):
         return
-    await message.delete()
+
+    try:
+        await message.delete()
+    except Exception:
+        logging.warning(f'Cannot delete join message in "{message.chat.title}" (no admin rights?)')
 
 
 @router.chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
