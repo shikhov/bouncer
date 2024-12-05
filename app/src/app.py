@@ -42,7 +42,7 @@ class Group:
         self.timeout_text = data.get('timeout_text', TIMEOUT_TEXT)
         self.captcha_timeout = data.get('captcha_timeout', CAPTCHA_TIMEOUT)
         self.logchatid = data.get('logchatid', LOGCHATID)
-        self.postcaptcha_spamcheck = data.get('postcaptcha_spamcheck', POSTCAPTCHA_SPAMCHECK)
+        self.force_spamcheck = data.get('force_spamcheck', FORCE_SPAMCHECK)
         self.delete_joins = data.get('delete_joins', DELETE_JOINS)
         self.delete_anonymous = data.get('delete_anonymous', DELETE_ANONYMOUS)
 
@@ -59,7 +59,7 @@ class Group:
 def loadSettings():
     global TOKEN, ADMINCHATID, LOGCHATID, GROUPS, EMOJI_LIST
     global WELCOME_TEXT, SUCCESS_TEXT, FAIL_TEXT, ERROR_TEXT, TIMEOUT_TEXT, CAPTCHA_TIMEOUT
-    global EMOJI_ROWSIZE, HASHTAG, POSTCAPTCHA_SPAMCHECK, DELETE_JOINS, DELETE_ANONYMOUS
+    global EMOJI_ROWSIZE, HASHTAG, FORCE_SPAMCHECK, DELETE_JOINS, DELETE_ANONYMOUS
 
     try:
         settings = db.settings.find_one({'_id': 'settings'})
@@ -77,7 +77,7 @@ def loadSettings():
         ERROR_TEXT = settings['ERROR_TEXT']
         TIMEOUT_TEXT = settings['TIMEOUT_TEXT']
         CAPTCHA_TIMEOUT = settings['CAPTCHA_TIMEOUT']
-        POSTCAPTCHA_SPAMCHECK = settings['POSTCAPTCHA_SPAMCHECK']
+        FORCE_SPAMCHECK = settings['FORCE_SPAMCHECK']
         DELETE_JOINS = settings['DELETE_JOINS']
         DELETE_ANONYMOUS = settings['DELETE_ANONYMOUS']
 
@@ -328,7 +328,7 @@ async def callbackHandler(query: types.CallbackQuery):
         kb = InlineKeyboardBuilder().button(text='Перейти', url='https://t.me/' + chat_username)
         await bot.edit_message_text(group.success_text, user.id, msg_id, reply_markup=kb.as_markup())
         await bot.send_message(group.logchatid, f'{HASHTAG}\n{logname} succeeded')
-        if not group.postcaptcha_spamcheck:
+        if not group.force_spamcheck:
             return
 
         docid = f'{chat_id}_{user.id}'
@@ -360,7 +360,7 @@ async def processMsg(message: types.Message):
     if message.sender_chat and group.delete_anonymous:
         await message.delete()
 
-    if group.postcaptcha_spamcheck:
+    if group.force_spamcheck:
         if await checkForSpam(message):
             updateStat(message)
 
