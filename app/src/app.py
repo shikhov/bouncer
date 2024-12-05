@@ -44,6 +44,7 @@ class Group:
         self.logchatid = data.get('logchatid', LOGCHATID)
         self.postcaptcha_spamcheck = data.get('postcaptcha_spamcheck', POSTCAPTCHA_SPAMCHECK)
         self.delete_joins = data.get('delete_joins', DELETE_JOINS)
+        self.delete_anonymous = data.get('delete_anonymous', DELETE_ANONYMOUS)
 
         if chat:
             self.welcome_text = self.welcome_text.replace('%CHAT_TITLE%', chat.title)
@@ -58,7 +59,7 @@ class Group:
 def loadSettings():
     global TOKEN, ADMINCHATID, LOGCHATID, GROUPS, EMOJI_LIST
     global WELCOME_TEXT, SUCCESS_TEXT, FAIL_TEXT, ERROR_TEXT, TIMEOUT_TEXT, CAPTCHA_TIMEOUT
-    global EMOJI_ROWSIZE, HASHTAG, POSTCAPTCHA_SPAMCHECK, DELETE_JOINS
+    global EMOJI_ROWSIZE, HASHTAG, POSTCAPTCHA_SPAMCHECK, DELETE_JOINS, DELETE_ANONYMOUS
 
     try:
         settings = db.settings.find_one({'_id': 'settings'})
@@ -78,6 +79,7 @@ def loadSettings():
         CAPTCHA_TIMEOUT = settings['CAPTCHA_TIMEOUT']
         POSTCAPTCHA_SPAMCHECK = settings['POSTCAPTCHA_SPAMCHECK']
         DELETE_JOINS = settings['DELETE_JOINS']
+        DELETE_ANONYMOUS = settings['DELETE_ANONYMOUS']
 
         stat = db.settings.find_one({'_id': 'stat'})
         regexChecker.load_list(settings['REGEX_LIST'], stat)
@@ -252,10 +254,6 @@ async def checkForSpam(message: types.Message):
     if user.id == bot.id:
         return False
 
-    if message.sender_chat:
-        await message.delete()
-        return True
-
     if isUserLegal(user, chat):
         return False
 
@@ -330,6 +328,9 @@ async def callbackHandler(query: types.CallbackQuery):
         kb = InlineKeyboardBuilder().button(text='Перейти', url='https://t.me/' + chat_username)
         await bot.edit_message_text(group.success_text, user.id, msg_id, reply_markup=kb.as_markup())
         await bot.send_message(group.logchatid, f'{HASHTAG}\n{logname} succeeded')
+        if not group.postcaptcha_spamcheck:
+            return
+
         docid = f'{chat_id}_{user.id}'
         doc = {
                 '_id': docid,
@@ -337,10 +338,10 @@ async def callbackHandler(query: types.CallbackQuery):
                 'last_name': user.last_name,
                 'username': user.username,
                 'chat_title': chat_username,
-                'islegal': not group.postcaptcha_spamcheck
+                'islegal': True
             }
         db.users.update_one({'_id': docid}, {'$set': doc}, upsert=True)
-        usersCache[docid] = not group.postcaptcha_spamcheck
+        usersCache[docid] = True
     else:
         await bot.edit_message_text(group.fail_text, user.id, msg_id)
         try:
@@ -355,8 +356,14 @@ async def processMsg(message: types.Message):
     if not await isChatAllowed(message.chat):
         return
 
-    if await checkForSpam(message):
-        updateStat(message)
+    group = Group(chat=message.chat)
+    if message.sender_chat and group.delete_anonymous:
+        await message.delete()
+
+    if group.postcaptcha_spamcheck:
+        if await checkForSpam(message):
+            updateStat(message)
+
 
 async def main():
     dp.include_router(router)
