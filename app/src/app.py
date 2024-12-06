@@ -57,7 +57,7 @@ class Group:
 
 
 def loadSettings():
-    global TOKEN, ADMINCHATID, LOGCHATID, GROUPS, EMOJI_LIST
+    global TOKEN, ADMINCHATID, LOGCHATID, LOGCHATIDS_ALL, GROUPS, EMOJI_LIST
     global WELCOME_TEXT, SUCCESS_TEXT, FAIL_TEXT, ERROR_TEXT, TIMEOUT_TEXT, CAPTCHA_TIMEOUT
     global EMOJI_ROWSIZE, HASHTAG, FORCE_SPAMCHECK, DELETE_JOINS, DELETE_ANONYMOUS
 
@@ -67,8 +67,10 @@ def loadSettings():
         TOKEN = settings['TOKEN']
         ADMINCHATID = settings['ADMINCHATID']
         LOGCHATID = settings.get('LOGCHATID', ADMINCHATID)
+        LOGCHATIDS_ALL = {g['logchatid'] for g in settings['GROUPS'] if 'logchatid' in g}
+        LOGCHATIDS_ALL.add(LOGCHATID)
         HASHTAG = settings['HASHTAG']
-        GROUPS = {chat['id']: chat for chat in settings['GROUPS']}
+        GROUPS = {g['id']: g for g in settings['GROUPS']}
         EMOJI_LIST = settings['EMOJI_LIST']
         EMOJI_ROWSIZE = settings['EMOJI_ROWSIZE']
         WELCOME_TEXT = settings['WELCOME_TEXT']
@@ -157,7 +159,7 @@ def isUserLegal(user: types.User, chat: types.Chat):
 async def isChatAllowed(chat: types.Chat):
     if chat.id in GROUPS:
         return True
-    if chat.id == LOGCHATID:
+    if chat.id in LOGCHATIDS_ALL:
         return True
     if chat.type == 'private':
         return True
