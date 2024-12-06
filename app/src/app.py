@@ -181,6 +181,8 @@ async def outer_middleware(handler, event, data):
 
 @router.message(F.new_chat_members)
 async def deleteJoinMessage(message: types.Message):
+    if message.chat.id not in GROUPS:
+        return
     group = Group(chat=message.chat)
     if not group.delete_joins:
         return
@@ -193,6 +195,8 @@ async def deleteJoinMessage(message: types.Message):
 
 @router.chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
 async def processJoin(event: types.ChatMemberUpdated):
+    if event.chat.id not in GROUPS:
+        return
     group = Group(chat=event.chat)
     if not group.force_spamcheck:
         return
@@ -358,6 +362,8 @@ async def callbackHandler(query: types.CallbackQuery):
 
 @router.message(F.chat.type != 'private')
 async def processMsg(message: types.Message):
+    if message.chat.id not in GROUPS:
+        return
     group = Group(chat=message.chat)
     if message.sender_chat and group.delete_anonymous:
         await message.delete()
