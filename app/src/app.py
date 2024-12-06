@@ -155,9 +155,9 @@ def isUserLegal(user: types.User, chat: types.Chat):
 
 
 async def isChatAllowed(chat: types.Chat):
-    if chat.id == LOGCHATID:
-        return False
     if chat.id in GROUPS:
+        return True
+    if chat.id == LOGCHATID:
         return True
     if chat.type == 'private':
         return True
@@ -170,11 +170,17 @@ async def isChatAllowed(chat: types.Chat):
     return False
 
 
-@router.message(F.new_chat_members)
-async def deleteJoinMessage(message: types.Message):
-    if not await isChatAllowed(message.chat):
+@dp.update.outer_middleware()
+async def outer_middleware(handler, event, data):
+    chat = getattr(event.event, "chat", None)
+    if chat and not await isChatAllowed(chat):
         return
 
+    return await handler(event, data)
+
+
+@router.message(F.new_chat_members)
+async def deleteJoinMessage(message: types.Message):
     group = Group(chat=message.chat)
     if not group.delete_joins:
         return
@@ -187,9 +193,6 @@ async def deleteJoinMessage(message: types.Message):
 
 @router.chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
 async def processJoin(event: types.ChatMemberUpdated):
-    if not await isChatAllowed(event.chat):
-        return
-
     group = Group(chat=event.chat)
     if not group.force_spamcheck:
         return
@@ -198,11 +201,11 @@ async def processJoin(event: types.ChatMemberUpdated):
     chat = event.chat
     docid = f'{chat.id}_{user.id}'
     data = {
-            '_id': docid,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'username': user.username,
-            'chat_title': chat.title,
+        '_id': docid,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'username': user.username,
+        'chat_title': chat.title,
     }
 
     doc = db.users.find_one({'_id': docid})
@@ -295,8 +298,6 @@ def updateStat(message: types.Message):
 
 @router.chat_join_request()
 async def processJoinRequest(update: types.ChatJoinRequest):
-    if not await isChatAllowed(update.chat):
-        return
     chat = update.chat
     user = update.from_user
     group = Group(chat=chat)
@@ -357,9 +358,6 @@ async def callbackHandler(query: types.CallbackQuery):
 
 @router.message(F.chat.type != 'private')
 async def processMsg(message: types.Message):
-    if not await isChatAllowed(message.chat):
-        return
-
     group = Group(chat=message.chat)
     if message.sender_chat and group.delete_anonymous:
         await message.delete()
