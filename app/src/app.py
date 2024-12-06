@@ -190,6 +190,10 @@ async def processJoin(event: types.ChatMemberUpdated):
     if not await isChatAllowed(event.chat):
         return
 
+    group = Group(chat=event.chat)
+    if not group.force_spamcheck:
+        return
+
     user = event.new_chat_member.user
     chat = event.chat
     docid = f'{chat.id}_{user.id}'
