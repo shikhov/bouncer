@@ -24,10 +24,7 @@ db = MongoClient(connstring).get_database(dbname)
 class Group:
     def __init__(self, chat_id=None, chat=None):
         if chat_id:
-            if isinstance(chat_id, str):
-                data = GROUPS[int(chat_id)]
-            else:
-                data = GROUPS[chat_id]
+            data = GROUPS[int(chat_id)]
         elif chat:
             data = GROUPS[chat.id]
         else:
@@ -57,7 +54,7 @@ class Group:
 
 
 def loadSettings():
-    global TOKEN, ADMINCHATID, LOGCHATID, LOGCHATIDS_ALL, GROUPS, EMOJI_LIST
+    global TOKEN, ADMINCHATID, LOGCHATID, ALLOWED_CHATS, GROUPS, EMOJI_LIST
     global WELCOME_TEXT, SUCCESS_TEXT, FAIL_TEXT, ERROR_TEXT, TIMEOUT_TEXT, CAPTCHA_TIMEOUT
     global EMOJI_ROWSIZE, HASHTAG, FORCE_SPAMCHECK, DELETE_JOINS, DELETE_ANONYMOUS
 
@@ -67,8 +64,9 @@ def loadSettings():
         TOKEN = settings['TOKEN']
         ADMINCHATID = settings['ADMINCHATID']
         LOGCHATID = settings.get('LOGCHATID', ADMINCHATID)
-        LOGCHATIDS_ALL = {g['logchatid'] for g in settings['GROUPS'] if 'logchatid' in g}
-        LOGCHATIDS_ALL.add(LOGCHATID)
+        ALLOWED_CHATS = [g['id'] for g in settings['GROUPS']] + \
+            [g['logchatid'] for g in settings['GROUPS'] if 'logchatid' in g] + \
+            [LOGCHATID]
         HASHTAG = settings['HASHTAG']
         GROUPS = {g['id']: g for g in settings['GROUPS']}
         EMOJI_LIST = settings['EMOJI_LIST']
@@ -157,9 +155,7 @@ def isUserLegal(user: types.User, chat: types.Chat):
 
 
 async def isChatAllowed(chat: types.Chat):
-    if chat.id in GROUPS:
-        return True
-    if chat.id in LOGCHATIDS_ALL:
+    if chat.id in ALLOWED_CHATS:
         return True
     if chat.type == 'private':
         return True
