@@ -303,7 +303,7 @@ async def processJoinRequest(update: types.ChatJoinRequest):
     chat = update.chat
     user = update.from_user
     group = Group(chat=chat)
-    logname = f'{hd.quote(user.full_name)} (@{user.username})' if user.username else hd.quote(user.full_name)
+    logname = hd.quote(f'{user.full_name} @{user.username}' if user.username else user.full_name)
     builder = InlineKeyboardBuilder()
     for emoji in group.random_emoji():
         builder.button(text=emoji, callback_data=f'{emoji}#{chat.id}#{chat.username}')
@@ -322,7 +322,7 @@ async def processJoinRequest(update: types.ChatJoinRequest):
 async def callbackHandler(query: types.CallbackQuery):
     user = query.from_user
     msg_id = query.message.message_id
-    logname = f'{hd.quote(user.full_name)} (@{user.username})' if user.username else hd.quote(user.full_name)
+    logname = hd.quote(f'{user.full_name} @{user.username}' if user.username else user.full_name)
     (answer, chat_id, chat_username) = query.data.split('#')
     group = Group(chat_id=chat_id)
     if group.is_right_answer(answer):
