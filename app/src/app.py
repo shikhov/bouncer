@@ -302,6 +302,9 @@ def updateStat(message: types.Message):
 async def processJoinRequest(update: types.ChatJoinRequest):
     chat = update.chat
     user = update.from_user
+    if isUserLegal(user, chat):
+        await bot.approve_chat_join_request(chat.id, user.id)
+        return
     group = Group(chat=chat)
     logname = hd.quote(f'{user.full_name} @{user.username}' if user.username else user.full_name)
     builder = InlineKeyboardBuilder()
@@ -335,8 +338,6 @@ async def callbackHandler(query: types.CallbackQuery):
         kb = InlineKeyboardBuilder().button(text='Перейти', url='https://t.me/' + chat_username)
         await bot.edit_message_text(group.success_text, user.id, msg_id, reply_markup=kb.as_markup())
         await bot.send_message(group.logchatid, f'{HASHTAG}\n{logname} succeeded')
-        if not group.force_spamcheck:
-            return
 
         docid = f'{chat_id}_{user.id}'
         doc = {
