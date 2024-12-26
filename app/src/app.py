@@ -182,35 +182,6 @@ async def deleteJoinMessage(message: types.Message):
         logging.warning(f'Cannot delete join message in "{message.chat.title}" (no admin rights?)')
 
 
-@router.chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
-async def processJoin(event: types.ChatMemberUpdated):
-    if event.chat.id not in GROUPS:
-        return
-    group = Group(chat=event.chat)
-    if not group.force_spamcheck:
-        return
-
-    user = event.new_chat_member.user
-    chat = event.chat
-    docid = f'{chat.id}_{user.id}'
-    data = {
-        '_id': docid,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'username': user.username,
-        'chat_title': chat.title,
-    }
-
-    doc = db.users.find_one({'_id': docid})
-    if doc:
-        data['islegal'] = doc['islegal']
-    else:
-        data['islegal'] = False
-
-    db.users.update_one({'_id': docid}, {'$set': data}, upsert=True)
-    usersCache[docid] = data['islegal']
-
-
 @router.message((F.text.lower() == 'unban') & (F.chat.id == LOGCHATID))
 async def processCmdUnban(message: types.Message):
     if not (message.reply_to_message and message.reply_to_message.text):
