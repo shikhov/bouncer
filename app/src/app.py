@@ -139,19 +139,10 @@ def isUserLegal(user: types.User, chat: types.Chat):
         return usersCache[key]
 
     doc = db.users.find_one({'_id': key})
-    if not doc:
-        doc = {
-                '_id': key,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'username': user.username,
-                'chat_title': chat.title,
-                'islegal': True
-            }
-        db.users.insert_one(doc)
-
-    usersCache[key] = doc['islegal']
-    return usersCache[key]
+    if doc:
+        usersCache[key] = doc['islegal']
+        return doc['islegal']
+    return False
 
 
 async def isChatAllowed(chat: types.Chat):
