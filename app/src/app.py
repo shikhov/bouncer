@@ -5,7 +5,7 @@ import traceback
 
 from aiogram import Bot, Dispatcher, Router, F, types
 from aiogram.utils.text_decorations import html_decoration as hd
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.utils.keyboard import KBuilder
 from aiogram.utils.callback_answer import CallbackAnswerMiddleware
 import random
 from pymongo import MongoClient
@@ -40,11 +40,20 @@ class Group:
         if chat:
             self.welcome_text = self.welcome_text.replace('%CHAT_TITLE%', chat.title)
 
-    def random_emoji(self):
-        return random.sample(self.emoji_list, len(self.emoji_list))
-
     def is_right_answer(self, answer):
         return answer == self.emoji_list[0]
+
+    def buttons(self):
+        kb = KBuilder()
+        for emoji in random.sample(self.emoji_list, len(self.emoji_list)):
+            kb.button(text=emoji, callback_data=f"{emoji}#{self.chat.id}#{self.chat.username or ''}")
+        kb.adjust(self.emoji_rowsize)
+        return kb.as_markup()
+
+    def chat_link_button(self, chat_username):
+        if not chat_username:
+            return None
+        return KBuilder().button(text='Перейти', url='https://t.me/' + chat_username).as_markup()
 
 
 def loadSettings():
@@ -153,11 +162,7 @@ async def processJoinRequest(update: types.ChatJoinRequest):
         return
     group = Group(chat=chat)
     logname = hd.quote(f'{user.full_name} @{user.username}' if user.username else user.full_name)
-    kb = InlineKeyboardBuilder()
-    for emoji in group.random_emoji():
-        kb.button(text=emoji, callback_data=f'{emoji}#{chat.id}#{chat.username}')
-    kb.adjust(group.emoji_rowsize)
-    message = await bot.send_message(user.id, group.welcome_text, reply_markup=kb.as_markup())
+    message = await bot.send_message(user.id, group.welcome_text, reply_markup=group.buttons())
     await bot.send_message(group.logchatid, f'{HASHTAG}\n{logname} wants to join {chat.title}')
     await asyncio.sleep(group.captcha_timeout)
     try:
@@ -181,10 +186,11 @@ async def callbackHandler(query: types.CallbackQuery):
             await bot.edit_message_text(group.error_text, user.id, msg_id)
             return
 
-        kb = InlineKeyboardBuilder().button(text='Перейти', url='https://t.me/' + chat_username)
-        await bot.edit_message_text(group.success_text, user.id, msg_id, reply_markup=kb.as_markup())
+        chat_link = None
+        if chat_username:
+            chat_link = KBuilder().button(text='Перейти', url='https://t.me/' + chat_username).as_markup()
+        await bot.edit_message_text(group.success_text, user.id, msg_id, reply_markup=chat_link)
         await bot.send_message(group.logchatid, f'{HASHTAG}\n{logname} succeeded')
-
         docid = f'{chat_id}_{user.id}'
         doc = {
                 '_id': docid,
