@@ -50,11 +50,6 @@ class Group:
         kb.adjust(self.emoji_rowsize)
         return kb.as_markup()
 
-    def chat_link_button(self, chat_username):
-        if not chat_username:
-            return None
-        return KBuilder().button(text='Перейти', url='https://t.me/' + chat_username).as_markup()
-
 
 def loadSettings():
     global TOKEN, ADMINCHATID, LOGCHATID, ALLOWED_CHATS, GROUPS, EMOJI_LIST
