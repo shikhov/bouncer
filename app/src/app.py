@@ -5,7 +5,7 @@ import traceback
 
 from aiogram import Bot, Dispatcher, Router, F, types
 from aiogram.utils.text_decorations import html_decoration as hd
-from aiogram.utils.keyboard import KBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder as KBuilder
 from aiogram.utils.callback_answer import CallbackAnswerMiddleware
 import random
 from pymongo import MongoClient
@@ -38,6 +38,7 @@ class Group:
         self.delete_anonymous = data.get('delete_anonymous', DELETE_ANONYMOUS)
 
         if chat:
+            self.chat = chat
             self.welcome_text = self.welcome_text.replace('%CHAT_TITLE%', chat.title)
 
     def is_right_answer(self, answer):
