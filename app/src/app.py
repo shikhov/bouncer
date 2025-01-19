@@ -92,6 +92,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 if not loadSettings():
     exit()
 
+active_requests = {}
+
 # Initialize bot and dispatcher
 bot = Bot(token=TOKEN, parse_mode='HTML')
 dp = Dispatcher()
@@ -156,15 +158,25 @@ async def processJoinRequest(update: types.ChatJoinRequest):
     if isUserLegal(user, chat):
         await bot.approve_chat_join_request(chat.id, user.id)
         return
+
+    key = f'{chat.id}_{user.id}'
+    if key in active_requests:
+        return
+
     group = Group(chat=chat)
-    logname = hd.quote(f'{user.full_name} @{user.username}' if user.username else user.full_name)
     message = await bot.send_message(user.id, group.welcome_text, reply_markup=group.buttons())
+    active_requests[key] = message.message_id
+    logname = hd.quote(f'{user.full_name} @{user.username}' if user.username else user.full_name)
     await bot.send_message(group.logchatid, f'{logname} wants to join {chat.title}\n{HASHTAG}')
     await asyncio.sleep(group.captcha_timeout)
+
+    if active_requests.get(key, 0) != message.message_id:
+        return
+    active_requests.pop(key, None)
     try:
         await bot.decline_chat_join_request(chat.id, user.id)
     except Exception:
-        return
+        pass
     await message.edit_text(group.timeout_text)
 
 
@@ -174,6 +186,9 @@ async def callbackHandler(query: types.CallbackQuery):
     msg_id = query.message.message_id
     logname = hd.quote(f'{user.full_name} @{user.username}' if user.username else user.full_name)
     (answer, chat_id, chat_username) = query.data.split('#')
+    key = f'{chat_id}_{user.id}'
+    active_requests.pop(key, None)
+
     group = Group(chat_id=chat_id)
     if group.is_right_answer(answer):
         try:
