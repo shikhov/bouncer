@@ -7,6 +7,7 @@ from aiogram import Bot, Dispatcher, Router, F, types
 from aiogram.utils.text_decorations import html_decoration as hd
 from aiogram.utils.keyboard import InlineKeyboardBuilder as KBuilder
 from aiogram.utils.callback_answer import CallbackAnswerMiddleware
+from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, KICKED
 import random
 from pymongo import MongoClient
 
@@ -127,6 +128,13 @@ async def outer_middleware(handler, event, data):
     if chat and not await isChatAllowed(chat):
         return
     return await handler(event, data)
+
+
+@router.chat_member(ChatMemberUpdatedFilter(member_status_changed=KICKED))
+async def processJoin(event: types.ChatMemberUpdated):
+    user = event.new_chat_member.user
+    chat = event.chat
+    db.users.delete_one({'_id': f'{chat.id}_{user.id}'})
 
 
 @router.message(F.new_chat_members)
