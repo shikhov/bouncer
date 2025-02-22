@@ -2,6 +2,7 @@ import logging
 import asyncio
 import os
 import traceback
+import regex
 
 from aiogram import Bot, Dispatcher, Router, F, types
 from aiogram.utils.text_decorations import html_decoration as hd
@@ -26,7 +27,7 @@ class Group:
         else:
             raise('Error object initialization')
 
-        self.emoji_list = list(data.get('emoji_list', EMOJI_LIST))
+        self.emoji_list = regex.findall(r'\X', data.get('emoji_list', EMOJI_LIST))
         self.emoji_rowsize = data.get('emoji_rowsize', EMOJI_ROWSIZE)
         self.welcome_text = data.get('welcome_text', WELCOME_TEXT)
         self.success_text = data.get('success_text', SUCCESS_TEXT)
