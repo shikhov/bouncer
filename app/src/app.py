@@ -176,7 +176,7 @@ async def processJoinRequest(update: types.ChatJoinRequest):
     message = await bot.send_message(user.id, group.welcome_text, reply_markup=group.buttons())
     active_requests[key] = message.message_id
     logname = hd.quote(f'{user.full_name} @{user.username}' if user.username else user.full_name)
-    await bot.send_message(group.logchatid, f'{logname} wants to join {chat.title}\n{HASHTAG}')
+    await log(group.logchatid, f'{logname} wants to join {chat.title}')
     await asyncio.sleep(group.captcha_timeout)
 
     if active_requests.get(key, 0) != message.message_id:
@@ -210,7 +210,7 @@ async def callbackHandler(query: types.CallbackQuery):
         if chat_username:
             chat_link = KBuilder().button(text='Перейти', url='https://t.me/' + chat_username).as_markup()
         await bot.edit_message_text(group.success_text, user.id, msg_id, reply_markup=chat_link)
-        await bot.send_message(group.logchatid, f'{logname} succeeded\n{HASHTAG}')
+        await log(group.logchatid, f'{logname} succeeded')
         docid = f'{chat_id}_{user.id}'
         doc = {
                 '_id': docid,
@@ -227,7 +227,16 @@ async def callbackHandler(query: types.CallbackQuery):
             await bot.decline_chat_join_request(chat_id, user.id)
         except Exception:
             return
-        await bot.send_message(group.logchatid, f'{logname} failed\n{HASHTAG}')
+        await log(group.logchatid, f'{logname} failed')
+
+
+async def log(logchatid, text):
+    logging.info(text)
+    if logchatid:
+        try:
+            await bot.send_message(logchatid, f'{text}\n{HASHTAG}')
+        except Exception:
+            logging.warning(f'Cannot log to chat id: {logchatid}')
 
 
 @router.message(F.chat.type != 'private')
