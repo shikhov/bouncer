@@ -65,11 +65,11 @@ def loadSettings():
         TOKEN = settings['TOKEN']
         ADMINCHATID = settings['ADMINCHATID']
         LOGCHATID = settings.get('LOGCHATID', ADMINCHATID)
-        ALLOWED_CHATS = [g['id'] for g in settings['GROUPS']] + \
-            [g['logchatid'] for g in settings['GROUPS'] if 'logchatid' in g] + \
+        GROUPS = {g['id']: g for g in settings['GROUPS'].values()}
+        ALLOWED_CHATS = [group_id for group_id in GROUPS] + \
+            [g['logchatid'] for g in GROUPS.values() if 'logchatid' in g] + \
             [LOGCHATID]
         HASHTAG = settings['HASHTAG']
-        GROUPS = {g['id']: g for g in settings['GROUPS']}
         EMOJI_LIST = settings['EMOJI_LIST']
         EMOJI_ROWSIZE = settings['EMOJI_ROWSIZE']
         WELCOME_TEXT = settings['WELCOME_TEXT']
