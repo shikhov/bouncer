@@ -132,7 +132,7 @@ async def outer_middleware(handler, event, data):
 
 
 @router.chat_member(ChatMemberUpdatedFilter(member_status_changed=KICKED))
-async def processJoin(event: types.ChatMemberUpdated):
+async def processBan(event: types.ChatMemberUpdated):
     user = event.new_chat_member.user
     chat = event.chat
     db.users.delete_one({'_id': f'{chat.id}_{user.id}'})
@@ -175,8 +175,8 @@ async def processJoinRequest(update: types.ChatJoinRequest):
     group = Group(chat=chat)
     message = await bot.send_message(user.id, group.welcome_text, reply_markup=group.buttons())
     active_requests[key] = message.message_id
-    logname = hd.quote(f'{user.full_name} @{user.username}' if user.username else user.full_name)
-    await log(group.logchatid, f'{logname} wants to join {chat.title}')
+    # logname = hd.quote(f'{user.full_name} @{user.username}' if user.username else user.full_name)
+    # await log(group.logchatid, f'{logname} wants to join {chat.title}')
     await asyncio.sleep(group.captcha_timeout)
 
     if active_requests.get(key, 0) != message.message_id:
@@ -210,7 +210,8 @@ async def callbackHandler(query: types.CallbackQuery):
         if chat_username:
             chat_link = KBuilder().button(text='Перейти', url='https://t.me/' + chat_username).as_markup()
         await bot.edit_message_text(group.success_text, user.id, msg_id, reply_markup=chat_link)
-        await log(group.logchatid, f'{logname} succeeded')
+        # await log(group.logchatid, f'{logname} succeeded')
+        await log(group.logchatid, f'{logname} joined {chat_username or chat_id}')
         docid = f'{chat_id}_{user.id}'
         doc = {
                 '_id': docid,
@@ -227,7 +228,7 @@ async def callbackHandler(query: types.CallbackQuery):
             await bot.decline_chat_join_request(chat_id, user.id)
         except Exception:
             return
-        await log(group.logchatid, f'{logname} failed')
+        # await log(group.logchatid, f'{logname} failed')
 
 
 async def log(logchatid, text):
