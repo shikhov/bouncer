@@ -42,6 +42,7 @@ class Group:
         if chat:
             self.chat = chat
             self.welcome_text = self.welcome_text.replace('%CHAT_TITLE%', chat.title)
+            self.timeout_text = self.timeout_text.replace('%CHAT_TITLE%', chat.title)
 
     def is_right_answer(self, answer):
         return answer == self.emoji_list[0]
